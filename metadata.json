@@ -1,0 +1,5 @@
+{
+  "name": "NEU Library Visitor App",
+  "description": "A visitor management system for the New Era University Library with Google Authentication and profile management.",
+  "requestFramePermissions": []
+}

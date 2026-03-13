@@ -1,0 +1,154 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (required)
+    //   - photoURL: string (optional)
+    //   - college: string (required)
+    //   - program: string (required)
+    //   - isAdmin: boolean (optional, default false)
+    //   - isBlocked: boolean (optional, default false)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: logs
+    // Document ID: {logId} (Auto-generated)
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - college: string (required)
+    //   - program: string (required)
+    //   - reason: string (required)
+    //   - timestamp: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDefaultAdmin() {
+      return isAuthenticated() && 
+             request.auth.token.email == "angelyn.bondoc@neu.edu.ph" && 
+             request.auth.token.email_verified == true;
+    }
+
+    // Safe Admin check: avoids recursion if checking the current user's own document
+    function isAdmin() {
+      return isDefaultAdmin() || (
+        isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true
+      );
+    }
+
+    // Safe Employee check
+    function isEmployee() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isEmployee', false) == true;
+    }
+
+    function isNotBlocked() {
+      let userDoc = /databases/$(database)/documents/users/$(request.auth.uid);
+      return !exists(userDoc) || get(userDoc).data.get('isBlocked', false) != true;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'college', 'program', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.displayName is string && data.displayName.size() < 100 &&
+             data.college is string && data.college.size() < 100 &&
+             data.program is string && data.program.size() < 100 &&
+             data.role in ['student', 'admin', 'employee'] &&
+             data.createdAt is timestamp &&
+             // Ensure role matches the flags
+             (data.get('isAdmin', false) == (data.role == 'admin')) &&
+             (data.get('isEmployee', false) == (data.role == 'employee'));
+    }
+
+    function isValidLog(data) {
+      return data.keys().hasAll(['uid', 'name', 'college', 'program', 'reason', 'timestamp']) &&
+             data.uid == request.auth.uid &&
+             data.name is string &&
+             data.college is string &&
+             data.program is string &&
+             data.reason in ['Reading', 'Research', 'Use of Computer', 'Studying'] &&
+             data.timestamp is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can always read their own profile (no recursion).
+      allow read: if isOwner(userId);
+      
+      // Default Admin has global read access.
+      allow read: if isDefaultAdmin();
+      
+      // Staff can read other profiles. 
+      // We explicitly check !isOwner to prevent recursion when a user reads themselves.
+      allow read: if !isOwner(userId) && (isAdmin() || isEmployee());
+      
+      // Users can create their own profile if it doesn't exist.
+      // They cannot set themselves as admin (unless they are the default admin) or blocked.
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.get('isAdmin', false) == false || isDefaultAdmin()) &&
+                      (request.resource.data.get('isBlocked', false) == false);
+      
+      // Users can update their own profile, but cannot change isAdmin, isEmployee, isBlocked or uid/email.
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) &&
+                      request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false) &&
+                      request.resource.data.get('isEmployee', false) == resource.data.get('isEmployee', false) &&
+                      request.resource.data.get('isBlocked', false) == resource.data.get('isBlocked', false) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.email == resource.data.email;
+                      
+      // Only admins can delete or perform other updates (like blocking).
+      allow delete: if isAdmin();
+      allow update: if isAdmin();
+    }
+
+    match /test/connection {
+      // Allow authenticated users to read the test connection document
+      allow read: if isAuthenticated();
+    }
+
+    match /logs/{logId} {
+      // Admins and Employees can read all logs. Users can read their own.
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin() || isEmployee());
+      
+      // Authenticated and non-blocked users can create a log record.
+      allow create: if isAuthenticated() && isNotBlocked() && isValidLog(request.resource.data);
+      
+      // Logs are immutable.
+      allow update, delete: if isAdmin();
+    }
+
+    match /visits/{visitId} {
+      // Legacy visits collection - keeping for compatibility
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin() || isEmployee());
+      allow create: if isAuthenticated() && isNotBlocked();
+      allow update, delete: if isAdmin();
+    }
+  }
+}
