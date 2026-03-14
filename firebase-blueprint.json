@@ -32,16 +32,12 @@
         },
         "role": {
           "type": "string",
-          "enum": ["student", "admin", "employee"],
+          "enum": ["student", "staff"],
           "description": "The role of the user."
         },
         "isAdmin": {
           "type": "boolean",
           "description": "Whether the user has administrative privileges."
-        },
-        "isEmployee": {
-          "type": "boolean",
-          "description": "Whether the user is a library employee."
         },
         "isBlocked": {
           "type": "boolean",

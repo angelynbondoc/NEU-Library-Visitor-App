@@ -35,6 +35,7 @@ import {
   AlertCircle, 
   ChevronRight, 
   Loader2,
+  Clock,
   BookOpen,
   School,
   GraduationCap,
@@ -50,6 +51,8 @@ import {
   History,
   ShieldAlert,
   ShieldCheck,
+  Check,
+  FileDown,
   UserX,
   UserCheck,
   Settings
@@ -57,6 +60,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { exportToPDF } from './utils/pdfExport';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -184,7 +188,8 @@ interface UserProfile {
   photoURL: string;
   college: string;
   program: string;
-  role: 'student' | 'admin' | 'employee';
+  role: 'student' | 'staff';
+  isApproved?: boolean;
   isAdmin: boolean;
   isEmployee?: boolean;
   isBlocked?: boolean;
@@ -216,11 +221,15 @@ interface LibraryLog {
   program: string;
   reason: string;
   timestamp: any;
+  status: 'pending' | 'validated' | 'blocked';
+  validatedBy?: string;
+  validatedAt?: any;
 }
 
 type DateFilter = 'today' | 'weekly' | 'monthly' | 'custom';
 
 const REASONS = ["Reading", "Research", "Use of Computer", "Studying"];
+const DEFAULT_ADMIN_EMAIL = "angelyn.bondoc@neu.edu.ph";
 
 const NEU_LOGO = "https://upload.wikimedia.org/wikipedia/en/c/c6/New_Era_University.svg";
 
@@ -344,7 +353,8 @@ export default function App() {
 
   // Admin Dashboard State
   const [view, setView] = useState<'user' | 'admin'>('user');
-  const [adminTab, setAdminTab] = useState<'entry' | 'analytics' | 'users'>('entry');
+  const [adminTab, setAdminTab] = useState<'profile' | 'analytics' | 'users'>('profile');
+  const [userFilter, setUserFilter] = useState<'all' | 'pending-admins' | 'pending-employees'>('all');
   const [allLogs, setAllLogs] = useState<LibraryLog[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter>('today');
@@ -401,7 +411,7 @@ export default function App() {
 
   // Fetch Admin Logs
   useEffect(() => {
-    if (!(profile?.isAdmin || profile?.isEmployee) || view !== 'admin') {
+    if (profile?.role !== 'staff' || view !== 'admin') {
       setAllLogs([]);
       return;
     }
@@ -451,7 +461,7 @@ export default function App() {
 
   // Fetch All Users for Management
   useEffect(() => {
-    if (!profile?.isAdmin || view !== 'admin' || adminTab !== 'users') {
+    if (profile?.role !== 'staff' || !profile?.isAdmin || view !== 'admin' || adminTab !== 'users') {
       setAllUsers([]);
       return;
     }
@@ -486,17 +496,34 @@ export default function App() {
       }
 
       if (firebaseUser) {
+        // Double check email domain on auth state change
+        if (firebaseUser.email && !firebaseUser.email.toLowerCase().endsWith("@neu.edu.ph")) {
+          auth.signOut();
+          setUser(null);
+          setProfile(null);
+          setError("Access Denied. Please use your @neu.edu.ph institutional account.");
+          setLoading(false);
+          return;
+        }
+
         setUser(firebaseUser);
         // Real-time profile listener for security
         profileUnsubscribe = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
           if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
+            let data = docSnap.data() as UserProfile;
+            
+            // Force Admin status for Default Admin Email
+            if (data.email === DEFAULT_ADMIN_EMAIL) {
+              data = { ...data, isAdmin: true, role: 'staff', isApproved: true };
+            }
+            
             setProfile(data);
             setIsNewUser(false);
 
-            // Auto-direct Admins and Employees to Dashboard
-            if ((data.isAdmin || data.isEmployee) && !hasAutoDirected) {
+            // Auto-direct Staff to Dashboard if approved
+            if (data.role === 'staff' && (data.isApproved || data.email === DEFAULT_ADMIN_EMAIL) && !hasAutoDirected) {
               setView('admin');
+              setAdminTab('profile');
               setShowSuccessGreeting(true);
               setHasAutoDirected(true);
               setTimeout(() => {
@@ -538,9 +565,19 @@ export default function App() {
   const handleLogin = async () => {
     try {
       setError(null);
-      await signInWithPopup(auth, googleProvider);
-    } catch (err) {
+      const result = await signInWithPopup(auth, googleProvider);
+      const userEmail = result.user.email;
+      
+      if (userEmail && !userEmail.toLowerCase().endsWith("@neu.edu.ph")) {
+        await auth.signOut();
+        setError("Access Denied. Please use your @neu.edu.ph institutional account.");
+        return;
+      }
+    } catch (err: any) {
       console.error("Login error:", err);
+      if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
+        return;
+      }
       setError("Failed to sign in with Google.");
     }
   };
@@ -572,7 +609,8 @@ export default function App() {
     setSubmitting(true);
     setError(null);
 
-    const role = userType === 'student' ? 'student' : (facultyRole as 'admin' | 'employee');
+    const role = userType === 'student' ? 'student' : 'staff';
+    const isDefaultAdmin = user.email === DEFAULT_ADMIN_EMAIL;
 
     const newProfile: UserProfile = {
       uid: user.uid,
@@ -582,8 +620,9 @@ export default function App() {
       college: userType === 'student' ? selectedCollege : 'Faculty/Staff',
       program: userType === 'student' ? selectedProgram : (facultyRole === 'admin' ? 'Administration' : 'Library Staff'),
       role: role,
-      isAdmin: role === 'admin',
-      isEmployee: role === 'employee',
+      isApproved: role === 'student' || isDefaultAdmin, // Students and default admin are auto-approved
+      isAdmin: facultyRole === 'admin' || isDefaultAdmin,
+      isEmployee: facultyRole === 'employee',
       isBlocked: false,
       createdAt: serverTimestamp(),
     };
@@ -592,7 +631,8 @@ export default function App() {
       await setDoc(doc(db, 'users', user.uid), newProfile);
       setProfile(newProfile);
       setIsNewUser(false);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("Profile setup error:", err);
       handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`, user);
     } finally {
       setSubmitting(false);
@@ -614,11 +654,12 @@ export default function App() {
       await addDoc(collection(db, 'logs'), {
         uid: user.uid,
         name: profile.displayName,
-        email: profile.email, // Added email for admin search
+        email: profile.email,
         college: profile.college,
         program: profile.program,
         reason: selectedReason,
-        timestamp: serverTimestamp()
+        timestamp: serverTimestamp(),
+        status: 'pending'
       });
       
       setShowSuccessGreeting(true);
@@ -637,6 +678,21 @@ export default function App() {
 
   const handleToggleBlock = async (targetUid: string, currentStatus: boolean) => {
     if (!profile?.isAdmin) return;
+
+    const targetUser = allUsers.find(u => u.uid === targetUid);
+    
+    // Only Default Admin can block/unblock other staff members
+    if (targetUser?.role === 'staff' && profile.email !== DEFAULT_ADMIN_EMAIL) {
+      setError("Only the Super Admin can change the block status of staff members.");
+      return;
+    }
+
+    // Cannot block the Default Admin
+    if (targetUser?.email === DEFAULT_ADMIN_EMAIL && !currentStatus) {
+      setError("The Super Admin cannot be blocked.");
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'users', targetUid), {
         isBlocked: !currentStatus
@@ -644,6 +700,129 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `users/${targetUid}`, user);
     }
+  };
+
+  const handleUpdateRole = async (targetUid: string, newRole: 'student' | 'staff') => {
+    if (!profile?.isAdmin) return;
+    
+    // Only Default Admin can demote staff/admins
+    const targetUser = allUsers.find(u => u.uid === targetUid);
+    if (targetUser?.role === 'staff' && profile.email !== DEFAULT_ADMIN_EMAIL) {
+      setError("Only the Super Admin can demote staff members.");
+      return;
+    }
+
+    // Cannot demote the Default Admin
+    if (targetUser?.email === DEFAULT_ADMIN_EMAIL && newRole === 'student') {
+      setError("The Super Admin cannot be demoted.");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', targetUid), {
+        role: newRole,
+        // If changing to student, also remove admin status for safety
+        ...(newRole === 'student' ? { isAdmin: false } : {})
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${targetUid}`, user);
+    }
+  };
+
+  const handleValidateLog = async (logId: string) => {
+    if (profile?.role !== 'staff' || !user) return;
+    try {
+      await updateDoc(doc(db, 'logs', logId), {
+        status: 'validated',
+        validatedBy: user.uid,
+        validatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `logs/${logId}`, user);
+    }
+  };
+
+  const handleBlockLog = async (logId: string, targetUid: string) => {
+    if (profile?.role !== 'staff' || !user) return;
+    try {
+      // Block the log entry
+      await updateDoc(doc(db, 'logs', logId), {
+        status: 'blocked',
+        validatedBy: user.uid,
+        validatedAt: serverTimestamp()
+      });
+      // Block the user globally
+      await updateDoc(doc(db, 'users', targetUid), {
+        isBlocked: true
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `logs/${logId}`, user);
+    }
+  };
+
+  const handleToggleAdmin = async (targetUid: string, currentStatus: boolean) => {
+    if (!profile?.isAdmin) return;
+
+    const targetUser = allUsers.find(u => u.uid === targetUid);
+    
+    // Only Default Admin can remove admin privileges from others
+    if (currentStatus && profile.email !== DEFAULT_ADMIN_EMAIL) {
+      setError("Only the Super Admin can remove admin privileges.");
+      return;
+    }
+
+    // Cannot remove admin status from Default Admin
+    if (targetUser?.email === DEFAULT_ADMIN_EMAIL && currentStatus) {
+      setError("The Super Admin's privileges cannot be removed.");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', targetUid), {
+        isAdmin: !currentStatus,
+        // Ensure role is staff if becoming admin
+        ...(!currentStatus ? { role: 'staff' } : {})
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${targetUid}`, user);
+    }
+  };
+
+  const handleApproveStaff = async (targetUid: string) => {
+    if (!profile?.isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'users', targetUid), {
+        isApproved: true
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${targetUid}`, user);
+    }
+  };
+
+  const handleExportPDF = () => {
+    // Calculate start/end dates for the filename and report
+    let startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+
+    if (dateFilter === 'weekly') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (dateFilter === 'monthly') {
+      startDate.setDate(startDate.getDate() - 30);
+    } else if (dateFilter === 'custom') {
+      startDate = new Date(customDateRange.start);
+    }
+
+    let endDate = new Date();
+    if (dateFilter === 'custom') {
+      endDate = new Date(customDateRange.end);
+    }
+
+    const dateRange = {
+      start: startDate.toLocaleDateString(),
+      end: endDate.toLocaleDateString()
+    };
+
+    exportToPDF(allLogs, allUsers, dateRange, dateFilter);
   };
 
   if (loading) {
@@ -834,7 +1013,21 @@ export default function App() {
                           />
                         </>
                       ) : (
-                        <div className="grid grid-cols-1 gap-4">
+                        <>
+                          {userType === 'faculty' && (
+                            <div className="bg-neu-gold/10 border border-neu-gold/20 rounded-2xl p-4 mb-4">
+                              <p className="text-neu-gold font-bold text-xs flex items-center gap-2">
+                                <ShieldAlert className="w-4 h-4" />
+                                RESTRICTED ACCESS
+                              </p>
+                              <p className="text-neu-blue/60 text-[10px] mt-1 font-medium">
+                                Staff and Admin roles require authorization from the Default Admin. 
+                                Unauthorized signups will be blocked by the system.
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 gap-4">
                           <button
                             type="button"
                             onClick={() => setFacultyRole('admin')}
@@ -868,9 +1061,10 @@ export default function App() {
                             </div>
                           </button>
                         </div>
-                      )}
+                      </>
+                    )}
 
-                      <div className="flex gap-4 pt-4">
+                    <div className="flex gap-4 pt-4">
                         <button
                           type="button"
                           onClick={() => setOnboardingStep(1)}
@@ -891,7 +1085,7 @@ export default function App() {
                 </form>
               </div>
             </motion.div>
-          ) : view === 'admin' && (profile?.isAdmin || profile?.isEmployee) ? (
+          ) : view === 'admin' && profile?.role === 'staff' && (profile?.isApproved || profile?.email === DEFAULT_ADMIN_EMAIL) ? (
             /* Admin Dashboard */
             <motion.div 
               key="admin"
@@ -902,7 +1096,7 @@ export default function App() {
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-2">
                   <h1 className="text-4xl font-black text-neu-blue tracking-tight">
-                    {profile.isAdmin ? 'Librarian Dashboard' : 'Employee Dashboard'}
+                    {profile.isAdmin ? 'Librarian Dashboard' : 'Staff Dashboard'}
                   </h1>
                   <p className="text-black/60 font-medium">
                     {profile.isAdmin ? 'Manage visitors and user accounts.' : 'View visitor analytics and history.'}
@@ -912,14 +1106,14 @@ export default function App() {
                 <div className="flex flex-col gap-4">
                   <div className="flex bg-neu-white p-1.5 rounded-2xl border border-neu-blue/5 self-end">
                     <button
-                      onClick={() => setAdminTab('entry')}
+                      onClick={() => setAdminTab('profile')}
                       className={cn(
                         "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
-                        adminTab === 'entry' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
+                        adminTab === 'profile' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
                       )}
                     >
-                      <Library className="w-4 h-4" />
-                      Entry
+                      <User className="w-4 h-4" />
+                      Profile
                     </button>
                     <button
                       onClick={() => setAdminTab('analytics')}
@@ -963,10 +1157,17 @@ export default function App() {
                       ))}
                     </div>
                   )}
+                  <button
+                    onClick={handleExportPDF}
+                    className="flex items-center gap-2 bg-neu-blue text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neu-cyan transition-all shadow-lg shadow-neu-blue/20 self-end mt-2"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export PDF
+                  </button>
                 </div>
               </div>
 
-              {adminTab === 'entry' ? (
+              {adminTab === 'profile' ? (
                 <div className="max-w-2xl mx-auto space-y-12">
                   {/* Profile Card */}
                   <div className="bg-white rounded-[40px] p-8 shadow-2xl shadow-neu-blue/5 border border-neu-blue/5 flex items-center gap-8 relative overflow-hidden">
@@ -991,6 +1192,13 @@ export default function App() {
                       <span className="bg-neu-gold text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-neu-gold/20">
                         {profile.isAdmin ? 'ADMINISTRATOR' : 'STAFF'}
                       </span>
+                      <button
+                        onClick={handleExportPDF}
+                        className="mt-4 flex items-center gap-2 bg-neu-blue/5 text-neu-blue px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-neu-blue hover:text-white transition-all w-full justify-center"
+                      >
+                        <FileDown className="w-3 h-3" />
+                        Export PDF
+                      </button>
                     </div>
                   </div>
 
@@ -998,56 +1206,7 @@ export default function App() {
                   <div className="text-center space-y-10">
                     <div className="space-y-4">
                       <h3 className="text-5xl font-black text-neu-blue tracking-tight">Welcome Back</h3>
-                      <p className="text-black/40 font-medium text-lg max-w-md mx-auto">
-                        Ready to enter the library? Select your reason below.
-                      </p>
                     </div>
-
-                    <form onSubmit={handleLibraryEntry} className="space-y-10">
-                      <div className="grid grid-cols-2 gap-4">
-                        {[
-                          { id: 'Reading', icon: <BookOpen className="w-5 h-5" /> },
-                          { id: 'Research', icon: <Search className="w-5 h-5" /> },
-                          { id: 'Use of Computer', icon: <Monitor className="w-5 h-5" /> },
-                          { id: 'Studying', icon: <GraduationCap className="w-5 h-5" /> }
-                        ].map((reason) => (
-                          <button
-                            key={reason.id}
-                            type="button"
-                            onClick={() => setSelectedReason(reason.id)}
-                            className={cn(
-                              "p-8 rounded-[32px] border-2 transition-all flex flex-col items-center gap-4 group",
-                              selectedReason === reason.id 
-                                ? "bg-neu-blue text-white border-neu-blue shadow-2xl shadow-neu-blue/20 scale-[1.02]" 
-                                : "bg-white text-neu-blue border-neu-white hover:border-neu-blue/20"
-                            )}
-                          >
-                            <div className={cn(
-                              "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors",
-                              selectedReason === reason.id ? "bg-white/20" : "bg-neu-white group-hover:bg-neu-blue/5"
-                            )}>
-                              {reason.icon}
-                            </div>
-                            <span className="font-bold text-lg">{reason.id}</span>
-                          </button>
-                        ))}
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={!selectedReason || submitting}
-                        className="w-full bg-neu-blue text-white rounded-[32px] py-6 text-xl font-black hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-2xl shadow-neu-blue/20"
-                      >
-                        {submitting ? (
-                          <Loader2 className="w-6 h-6 animate-spin" />
-                        ) : (
-                          <>
-                            <Library className="w-6 h-6" />
-                            Register Entry
-                          </>
-                        )}
-                      </button>
-                    </form>
                   </div>
                 </div>
               ) : adminTab === 'analytics' ? (
@@ -1080,62 +1239,67 @@ export default function App() {
               )}
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-neu-blue text-white p-8 rounded-[32px] shadow-xl shadow-neu-blue/20 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:scale-110 transition-transform" />
-                  <div className="relative z-10 space-y-4">
-                    <div className="bg-white/20 w-12 h-12 rounded-2xl flex items-center justify-center">
-                      <UsersIcon className="w-6 h-6" />
+              {(() => {
+                const validatedLogs = allLogs.filter(log => log.status === 'validated');
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-neu-blue text-white p-8 rounded-[32px] shadow-xl shadow-neu-blue/20 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:scale-110 transition-transform" />
+                      <div className="relative z-10 space-y-4">
+                        <div className="bg-white/20 w-12 h-12 rounded-2xl flex items-center justify-center">
+                          <UsersIcon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Validated Visitors</p>
+                          <h3 className="text-5xl font-black">{validatedLogs.length}</h3>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-white/60 text-xs font-bold uppercase tracking-widest">Total Visitors</p>
-                      <h3 className="text-5xl font-black">{allLogs.length}</h3>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Top Colleges Breakdown */}
-                <div className="md:col-span-2 bg-white p-8 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-bold text-neu-blue">Top Colleges</h3>
-                      <p className="text-xs text-black/40 font-medium">Distribution of visitors by department.</p>
-                    </div>
-                    <TrendingUp className="w-5 h-5 text-neu-gold" />
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {(() => {
-                      const collegeCounts: Record<string, number> = {};
-                      allLogs.forEach(log => {
-                        collegeCounts[log.college] = (collegeCounts[log.college] || 0) + 1;
-                      });
+                    {/* Top Colleges Breakdown */}
+                    <div className="md:col-span-2 bg-white p-8 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="space-y-1">
+                          <h3 className="text-xl font-bold text-neu-blue">Top Colleges</h3>
+                          <p className="text-xs text-black/40 font-medium">Distribution of validated visitors by department.</p>
+                        </div>
+                        <TrendingUp className="w-5 h-5 text-neu-gold" />
+                      </div>
                       
-                      return Object.entries(collegeCounts)
-                        .sort(([, a], [, b]) => b - a)
-                        .slice(0, 3)
-                        .map(([college, count]) => (
-                          <div key={college} className="space-y-2">
-                            <div className="flex justify-between text-sm font-bold">
-                              <span className="text-neu-blue truncate max-w-[200px]">{college}</span>
-                              <span className="text-neu-gold">{count}</span>
-                            </div>
-                            <div className="h-2 bg-neu-white rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(count / allLogs.length) * 100}%` }}
-                                className="h-full bg-neu-blue"
-                              />
-                            </div>
-                          </div>
-                        ));
-                    })()}
-                    {allLogs.length === 0 && (
-                      <p className="text-center py-4 text-black/30 font-medium text-sm italic">No data available for this period.</p>
-                    )}
+                      <div className="space-y-4">
+                        {(() => {
+                          const collegeCounts: Record<string, number> = {};
+                          validatedLogs.forEach(log => {
+                            collegeCounts[log.college] = (collegeCounts[log.college] || 0) + 1;
+                          });
+                          
+                          return Object.entries(collegeCounts)
+                            .sort(([, a], [, b]) => b - a)
+                            .slice(0, 3)
+                            .map(([college, count]) => (
+                              <div key={college} className="space-y-2">
+                                <div className="flex justify-between text-sm font-bold">
+                                  <span className="text-neu-blue truncate max-w-[200px]">{college}</span>
+                                  <span className="text-neu-gold">{count}</span>
+                                </div>
+                                <div className="h-2 bg-neu-white rounded-full overflow-hidden">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(count / validatedLogs.length) * 100}%` }}
+                                    className="h-full bg-neu-blue"
+                                  />
+                                </div>
+                              </div>
+                            ));
+                        })()}
+                        {validatedLogs.length === 0 && (
+                          <p className="text-center py-4 text-black/30 font-medium text-sm italic">No validated entries for this period.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* History Table */}
               <div className="bg-white rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 overflow-hidden">
@@ -1164,7 +1328,8 @@ export default function App() {
                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-black/40">Visitor</th>
                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-black/40">College & Program</th>
                         <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-black/40">Reason</th>
-                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-black/40">Time</th>
+                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-black/40">Status</th>
+                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-black/40">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neu-blue/5">
@@ -1183,6 +1348,15 @@ export default function App() {
                                 <div>
                                   <p className="font-bold text-neu-blue">{log.name}</p>
                                   <p className="text-xs text-black/40 font-medium">{log.email || 'No email'}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-[10px] text-black/40 font-black uppercase tracking-widest">
+                                      {log.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    <span className="text-[10px] text-black/20">•</span>
+                                    <p className="text-[10px] text-black/40 font-black uppercase tracking-widest">
+                                      {log.timestamp?.toDate().toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -1196,12 +1370,47 @@ export default function App() {
                               </span>
                             </td>
                             <td className="px-8 py-6">
-                              <p className="text-sm font-bold text-neu-blue">
-                                {log.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                              <p className="text-[10px] text-black/40 font-black uppercase tracking-widest">
-                                {log.timestamp?.toDate().toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                              </p>
+                              <div className="space-y-1">
+                                <span className={cn(
+                                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 w-fit",
+                                  log.status === 'validated' ? "bg-emerald-500 text-white" :
+                                  log.status === 'blocked' ? "bg-red-500 text-white" :
+                                  "bg-neu-gold text-white"
+                                )}>
+                                  {log.status === 'validated' && <ShieldCheck className="w-3 h-3" />}
+                                  {log.status === 'blocked' && <ShieldAlert className="w-3 h-3" />}
+                                  {log.status || 'pending'}
+                                </span>
+                                {log.validatedBy && (
+                                  <p className="text-[8px] text-black/40 font-black uppercase tracking-widest">
+                                    By: {allUsers.find(u => u.uid === log.validatedBy)?.displayName || 'Staff'}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-8 py-6">
+                              {log.status === 'pending' || !log.status ? (
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleValidateLog(log.id)}
+                                    className="bg-emerald-500 text-white p-2 rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+                                    title="Validate Entry"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleBlockLog(log.id, log.uid)}
+                                    className="bg-red-500 text-white p-2 rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                                    title="Block User"
+                                  >
+                                    <UserX className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-black/20 font-black uppercase tracking-widest">
+                                  Processed
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1233,9 +1442,41 @@ export default function App() {
               /* User Management UI */
                 <div className="bg-white rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 overflow-hidden">
                   <div className="p-8 border-b border-neu-blue/5 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-3">
-                      <Settings className="w-6 h-6 text-neu-blue" />
-                      <h3 className="text-2xl font-bold text-neu-blue">User Management</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Settings className="w-6 h-6 text-neu-blue" />
+                        <h3 className="text-2xl font-bold text-neu-blue">User Management</h3>
+                      </div>
+                      
+                      <div className="flex gap-2 p-1 bg-neu-white rounded-xl w-fit">
+                        <button 
+                          onClick={() => setUserFilter('all')}
+                          className={cn(
+                            "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                            userFilter === 'all' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
+                          )}
+                        >
+                          All Users
+                        </button>
+                        <button 
+                          onClick={() => setUserFilter('pending-admins')}
+                          className={cn(
+                            "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                            userFilter === 'pending-admins' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
+                          )}
+                        >
+                          Pending Admins
+                        </button>
+                        <button 
+                          onClick={() => setUserFilter('pending-employees')}
+                          className={cn(
+                            "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                            userFilter === 'pending-employees' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
+                          )}
+                        >
+                          Pending Employees
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="relative w-full md:w-72">
@@ -1262,10 +1503,18 @@ export default function App() {
                       </thead>
                       <tbody className="divide-y divide-neu-blue/5">
                         {allUsers
-                          .filter(u => 
-                            u.displayName.toLowerCase().includes(adminSearchTerm.toLowerCase()) ||
-                            u.email.toLowerCase().includes(adminSearchTerm.toLowerCase())
-                          )
+                          .filter(u => {
+                            const matchesSearch = u.displayName.toLowerCase().includes(adminSearchTerm.toLowerCase()) ||
+                                                 u.email.toLowerCase().includes(adminSearchTerm.toLowerCase());
+                            
+                            if (userFilter === 'pending-admins') {
+                              return matchesSearch && u.role === 'staff' && !u.isApproved && u.isAdmin;
+                            }
+                            if (userFilter === 'pending-employees') {
+                              return matchesSearch && u.role === 'staff' && !u.isApproved && !u.isAdmin;
+                            }
+                            return matchesSearch;
+                          })
                           .map((u) => (
                             <tr key={u.uid} className="hover:bg-neu-blue/5 transition-colors group">
                               <td className="px-8 py-6">
@@ -1278,6 +1527,24 @@ export default function App() {
                                   <div>
                                     <p className="font-bold text-neu-blue">{u.displayName}</p>
                                     <p className="text-xs text-black/40 font-medium">{u.email}</p>
+                                    <div className="flex gap-1 mt-1">
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                                        u.role === 'staff' ? "bg-neu-blue text-white" : "bg-neu-white text-neu-blue"
+                                      )}>
+                                        {u.role}
+                                      </span>
+                                      {u.role === 'staff' && !u.isApproved && (
+                                        <span className="bg-neu-gold/10 text-neu-gold px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border border-neu-gold/20">
+                                          Pending Approval
+                                        </span>
+                                      )}
+                                      {u.isAdmin && (
+                                        <span className="bg-neu-gold text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">
+                                          Admin
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -1299,21 +1566,60 @@ export default function App() {
                                 )}
                               </td>
                               <td className="px-8 py-6">
-                                <button
-                                  onClick={() => handleToggleBlock(u.uid, !!u.isBlocked)}
-                                  className={cn(
-                                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                                    u.isBlocked 
-                                      ? "bg-emerald-500 text-white hover:bg-emerald-600" 
-                                      : "bg-red-500 text-white hover:bg-red-600"
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    onClick={() => handleToggleBlock(u.uid, !!u.isBlocked)}
+                                    disabled={u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)}
+                                    title={u.isBlocked ? "Unblock User" : "Block User"}
+                                    className={cn(
+                                      "p-2 rounded-xl transition-all",
+                                      u.isBlocked 
+                                        ? "bg-emerald-500 text-white hover:bg-emerald-600" 
+                                        : "bg-red-500 text-white hover:bg-red-600",
+                                      (u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)) && "opacity-20 cursor-not-allowed grayscale"
+                                    )}
+                                  >
+                                    {u.isBlocked ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleUpdateRole(u.uid, u.role === 'staff' ? 'student' : 'staff')}
+                                    disabled={u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)}
+                                    title={u.role === 'staff' ? "Demote to Student" : "Promote to Staff"}
+                                    className={cn(
+                                      "p-2 rounded-xl transition-all",
+                                      u.role === 'staff' ? "bg-neu-white text-neu-blue hover:bg-neu-blue/10" : "bg-neu-blue text-white hover:bg-neu-cyan",
+                                      (u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)) && "opacity-20 cursor-not-allowed grayscale"
+                                    )}
+                                  >
+                                    <UsersIcon className="w-4 h-4" />
+                                  </button>
+
+                                  {u.role === 'staff' && (
+                                    <button
+                                      onClick={() => handleToggleAdmin(u.uid, !!u.isAdmin)}
+                                      disabled={u.email === DEFAULT_ADMIN_EMAIL || (u.isAdmin && profile?.email !== DEFAULT_ADMIN_EMAIL)}
+                                      title={u.isAdmin ? "Remove Admin Privileges" : "Make Administrator"}
+                                      className={cn(
+                                        "p-2 rounded-xl transition-all",
+                                        u.isAdmin ? "bg-neu-gold text-white hover:bg-neu-gold/80" : "bg-neu-white text-neu-gold border border-neu-gold/20 hover:bg-neu-gold/5",
+                                        (u.email === DEFAULT_ADMIN_EMAIL || (u.isAdmin && profile?.email !== DEFAULT_ADMIN_EMAIL)) && "opacity-20 cursor-not-allowed grayscale"
+                                      )}
+                                    >
+                                      <ShieldCheck className="w-4 h-4" />
+                                    </button>
                                   )}
-                                >
-                                  {u.isBlocked ? (
-                                    <><ShieldCheck className="w-3.5 h-3.5" /> Unblock</>
-                                  ) : (
-                                    <><ShieldAlert className="w-3.5 h-3.5" /> Block</>
+
+                                  {u.role === 'staff' && !u.isApproved && (
+                                    <button
+                                      onClick={() => handleApproveStaff(u.uid)}
+                                      title="Approve Staff Member"
+                                      className="p-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 transition-all"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </button>
                                   )}
-                                </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1322,6 +1628,38 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </motion.div>
+          ) : profile?.role === 'staff' && !profile?.isApproved && profile?.email !== DEFAULT_ADMIN_EMAIL ? (
+            /* Pending Approval View */
+            <motion.div
+              key="pending"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="max-w-md mx-auto"
+            >
+              <div className="bg-white rounded-[40px] p-10 shadow-2xl shadow-neu-blue/10 border border-neu-blue/5 text-center space-y-8">
+                <div className="w-24 h-24 bg-neu-gold/10 rounded-full flex items-center justify-center mx-auto">
+                  <Clock className="w-12 h-12 text-neu-gold animate-pulse" />
+                </div>
+                <div className="space-y-4">
+                  <h2 className="text-3xl font-black text-neu-blue leading-tight">Approval Pending</h2>
+                  <p className="text-black/60 font-medium leading-relaxed">
+                    Your request for <span className="text-neu-blue font-bold">{profile.isAdmin ? 'Administrator' : 'Employee'}</span> access has been submitted.
+                  </p>
+                  <div className="bg-neu-white p-4 rounded-2xl border border-neu-blue/5 text-left">
+                    <p className="text-[10px] font-black text-neu-blue/40 uppercase tracking-widest mb-2">Next Steps</p>
+                    <p className="text-sm text-neu-blue/80 font-semibold">
+                      Please contact the Chief Librarian to verify your identity and approve your account.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-neu-white text-neu-blue rounded-2xl py-5 font-bold hover:bg-neu-blue/5 transition-all"
+                >
+                  Sign Out
+                </button>
+              </div>
             </motion.div>
           ) : (
             /* Library Entry Screen */
