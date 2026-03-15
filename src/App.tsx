@@ -55,7 +55,9 @@ import {
   FileDown,
   UserX,
   UserCheck,
-  Settings
+  Settings,
+  Wifi,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -231,7 +233,8 @@ type DateFilter = 'today' | 'weekly' | 'monthly' | 'custom';
 const REASONS = ["Reading", "Research", "Use of Computer", "Studying"];
 const DEFAULT_ADMIN_EMAIL = "angelyn.bondoc@neu.edu.ph";
 
-const NEU_LOGO = "https://upload.wikimedia.org/wikipedia/en/c/c6/New_Era_University.svg";
+const NEU_LOGO = "https://scontent.fmnl17-6.fna.fbcdn.net/v/t39.30808-6/587748546_122156030186743934_2851142283168601511_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=XcurpbSYAxYQ7kNvwH4Jml7&_nc_oc=AdlaQg5JYJusEkjkJAxBPbop4uek1nntno4w8llnNy84Le6bWNhZpxwv1sGbPDB-nZc&_nc_zt=23&_nc_ht=scontent.fmnl17-6.fna&_nc_gid=1L5oGNhcvxhBfW0XcX5mYA&_nc_ss=8&oh=00_AfzVckmuGO5EBdWEdvI1PLdw-rMUucAl_5AZYPl4tc8a1Q&oe=69BC8A35";
+const LIB_LOGO = NEU_LOGO;
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -667,6 +670,10 @@ export default function App() {
       
       setTimeout(() => {
         setShowSuccessGreeting(false);
+        // Automatically log out students after submission
+        if (profile.role === 'student') {
+          handleLogout();
+        }
       }, 3000);
       
     } catch (err) {
@@ -856,7 +863,11 @@ export default function App() {
               <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight">
                 Welcome to <br /> NEU Library!
               </h1>
-              <p className="text-2xl font-medium opacity-80">Enjoy your stay and happy learning.</p>
+              <p className="text-2xl font-medium opacity-80">
+                {profile?.role === 'staff' 
+                  ? "Your dedication powers our community's learning. Let's make today count!" 
+                  : "Enjoy your stay and happy learning."}
+              </p>
             </motion.div>
           </motion.div>
         )}
@@ -866,7 +877,7 @@ export default function App() {
       <nav className="border-b border-neu-blue/10 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <img src={NEU_LOGO} alt="NEU Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+            <img src={NEU_LOGO} alt="NEU Logo" className="w-10 h-10 object-contain rounded-full mix-blend-multiply" referrerPolicy="no-referrer" />
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-tight text-neu-blue leading-none">NEU</span>
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-neu-gold">Library Visitor</span>
@@ -876,7 +887,7 @@ export default function App() {
             {user && (
               <button 
                 onClick={handleLogout}
-                className="flex items-center gap-2 text-sm text-neu-blue hover:text-neu-cyan transition-colors font-medium"
+                className="flex items-center gap-2 text-sm text-neu-blue hover:text-neu-cyan transition-colors font-medium cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign Out</span>
@@ -898,20 +909,69 @@ export default function App() {
               className="max-w-md mx-auto text-center space-y-12"
             >
               <div className="space-y-6">
-                <img src={NEU_LOGO} alt="NEU Logo" className="w-32 h-32 mx-auto drop-shadow-2xl" referrerPolicy="no-referrer" />
+                <img src={LIB_LOGO} alt="NEU Library Logo" className="w-48 h-48 mx-auto drop-shadow-2xl rounded-full mix-blend-multiply" referrerPolicy="no-referrer" />
                 <div className="space-y-4">
                   <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-neu-blue">
-                    Welcome to the NEU Library
+                    NEU Library Visitor App
                   </h1>
                   <p className="text-lg text-black/60 font-medium">
                     Your gateway to wisdom and knowledge.
                   </p>
                 </div>
               </div>
+
+              {/* Library Details from Image */}
+              <div className="bg-white rounded-3xl p-8 shadow-xl border border-neu-blue/5 space-y-8">
+                <div className="bg-neu-blue text-white p-6 rounded-2xl space-y-2">
+                  <div className="flex justify-between items-center border-b border-white/20 pb-2">
+                    <span className="font-bold text-sm">M / T / W / F</span>
+                    <span className="font-mono text-sm">7:00am - 7:00pm</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-sm">THU / SAT</span>
+                    <span className="font-mono text-sm">7:00am - 6:00pm</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-neu-blue/10 p-2 rounded-lg">
+                      <Wifi className="w-5 h-5 text-neu-blue" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-neu-blue text-sm">Free WiFi</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-neu-blue/10 p-2 rounded-lg">
+                      <BookOpen className="w-5 h-5 text-neu-blue" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-neu-blue text-sm">Book Lending</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-neu-blue/10 p-2 rounded-lg">
+                      <Printer className="w-5 h-5 text-neu-blue" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-neu-blue text-sm leading-tight">Printing and Photocopying</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-neu-blue/10 p-2 rounded-lg">
+                      <Monitor className="w-5 h-5 text-neu-blue" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-neu-blue text-sm leading-tight">Print and Electronic Resources</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
               
               <button 
                 onClick={handleLogin}
-                className="w-full bg-neu-blue text-white rounded-2xl py-5 px-8 flex items-center justify-center gap-3 hover:bg-neu-cyan transition-all shadow-xl shadow-neu-blue/20 group"
+                className="w-full bg-neu-blue text-white rounded-2xl py-5 px-8 flex items-center justify-center gap-3 hover:bg-neu-cyan transition-all shadow-xl shadow-neu-blue/20 group cursor-pointer"
               >
                 <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
                 <span className="text-lg font-bold">Sign in with Google</span>
@@ -954,7 +1014,7 @@ export default function App() {
                           setUserType('student');
                           setOnboardingStep(2);
                         }}
-                        className="p-8 rounded-2xl border-2 border-neu-white hover:border-neu-blue text-left group transition-all"
+                        className="p-8 rounded-2xl border-2 border-neu-white hover:border-neu-blue text-left group transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between">
                           <div className="space-y-1">
@@ -970,7 +1030,7 @@ export default function App() {
                           setUserType('faculty');
                           setOnboardingStep(2);
                         }}
-                        className="p-8 rounded-2xl border-2 border-neu-white hover:border-neu-blue text-left group transition-all"
+                        className="p-8 rounded-2xl border-2 border-neu-white hover:border-neu-blue text-left group transition-all cursor-pointer"
                       >
                         <div className="flex items-center justify-between">
                           <div className="space-y-1">
@@ -1032,7 +1092,7 @@ export default function App() {
                             type="button"
                             onClick={() => setFacultyRole('admin')}
                             className={cn(
-                              "p-6 rounded-2xl border-2 transition-all text-left",
+                              "p-6 rounded-2xl border-2 transition-all text-left cursor-pointer",
                               facultyRole === 'admin' ? "bg-neu-blue text-white border-neu-blue shadow-lg shadow-neu-blue/20" : "bg-white text-neu-blue border-neu-white hover:border-neu-blue"
                             )}
                           >
@@ -1048,7 +1108,7 @@ export default function App() {
                             type="button"
                             onClick={() => setFacultyRole('employee')}
                             className={cn(
-                              "p-6 rounded-2xl border-2 transition-all text-left",
+                              "p-6 rounded-2xl border-2 transition-all text-left cursor-pointer",
                               facultyRole === 'employee' ? "bg-neu-blue text-white border-neu-blue shadow-lg shadow-neu-blue/20" : "bg-white text-neu-blue border-neu-white hover:border-neu-blue"
                             )}
                           >
@@ -1068,14 +1128,14 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setOnboardingStep(1)}
-                          className="flex-1 bg-neu-white text-neu-blue rounded-2xl py-5 font-bold hover:bg-neu-blue/5 transition-all"
+                          className="flex-1 bg-neu-white text-neu-blue rounded-2xl py-5 font-bold hover:bg-neu-blue/5 transition-all cursor-pointer"
                         >
                           Back
                         </button>
                         <button 
                           type="submit"
                           disabled={submitting || (userType === 'student' ? !selectedProgram : !facultyRole)}
-                          className="flex-[2] bg-neu-blue text-white rounded-2xl py-5 font-bold hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-neu-blue/20"
+                          className="flex-[2] bg-neu-blue text-white rounded-2xl py-5 font-bold hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-neu-blue/20 cursor-pointer"
                         >
                           {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Complete Setup"}
                         </button>
@@ -1108,7 +1168,7 @@ export default function App() {
                     <button
                       onClick={() => setAdminTab('profile')}
                       className={cn(
-                        "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                        "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer",
                         adminTab === 'profile' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
                       )}
                     >
@@ -1118,7 +1178,7 @@ export default function App() {
                     <button
                       onClick={() => setAdminTab('analytics')}
                       className={cn(
-                        "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                        "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer",
                         adminTab === 'analytics' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
                       )}
                     >
@@ -1129,7 +1189,7 @@ export default function App() {
                       <button
                         onClick={() => setAdminTab('users')}
                         className={cn(
-                          "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                          "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer",
                           adminTab === 'users' ? "bg-white text-neu-blue shadow-sm" : "text-black/40 hover:text-neu-blue"
                         )}
                       >
@@ -1582,18 +1642,16 @@ export default function App() {
                                     {u.isBlocked ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
                                   </button>
 
-                                  <button
-                                    onClick={() => handleUpdateRole(u.uid, u.role === 'staff' ? 'student' : 'staff')}
-                                    disabled={u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)}
-                                    title={u.role === 'staff' ? "Demote to Student" : "Promote to Staff"}
-                                    className={cn(
-                                      "p-2 rounded-xl transition-all",
-                                      u.role === 'staff' ? "bg-neu-white text-neu-blue hover:bg-neu-blue/10" : "bg-neu-blue text-white hover:bg-neu-cyan",
-                                      (u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)) && "opacity-20 cursor-not-allowed grayscale"
-                                    )}
-                                  >
-                                    <UsersIcon className="w-4 h-4" />
-                                  </button>
+                                  {u.role !== 'staff' && (
+                                    <button
+                                      onClick={() => handleUpdateRole(u.uid, 'staff')}
+                                      disabled={profile?.email !== DEFAULT_ADMIN_EMAIL}
+                                      title="Promote to Staff"
+                                      className="p-2 rounded-xl bg-neu-blue text-white hover:bg-neu-cyan transition-all"
+                                    >
+                                      <UsersIcon className="w-4 h-4" />
+                                    </button>
+                                  )}
 
                                   {u.role === 'staff' && (
                                     <button
@@ -1693,11 +1751,6 @@ export default function App() {
 
               {/* Action Area */}
               <div className="max-w-md mx-auto text-center space-y-8">
-                <div className="space-y-4">
-                  <h3 className="text-4xl font-extrabold text-neu-blue">Welcome Back</h3>
-                  <p className="text-lg text-black/60 font-medium">Ready to enter the library? Select your reason below.</p>
-                </div>
-
                 {profile?.isBlocked ? (
                   <div className="bg-red-50 text-red-600 p-8 rounded-[32px] border-2 border-red-200 space-y-4">
                     <AlertCircle className="w-16 h-16 mx-auto" />
@@ -1705,7 +1758,12 @@ export default function App() {
                     <p className="text-lg font-medium">Please see the Librarian for assistance.</p>
                   </div>
                 ) : (
-                  <form onSubmit={handleLibraryEntry} className="space-y-8">
+                  <>
+                    <div className="space-y-4">
+                      <h3 className="text-4xl font-extrabold text-neu-blue">Welcome Back</h3>
+                      <p className="text-lg text-black/60 font-medium">Ready to enter the library? Select your reason below.</p>
+                    </div>
+                    <form onSubmit={handleLibraryEntry} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {REASONS.map((reason) => (
                         <button
@@ -1713,7 +1771,7 @@ export default function App() {
                           type="button"
                           onClick={() => setSelectedReason(reason)}
                           className={cn(
-                            "p-6 rounded-2xl border-2 transition-all text-lg font-bold flex items-center justify-center gap-3",
+                            "p-6 rounded-2xl border-2 transition-all text-lg font-bold flex items-center justify-center gap-3 cursor-pointer",
                             selectedReason === reason 
                               ? "bg-neu-blue text-white border-neu-blue shadow-lg shadow-neu-blue/20" 
                               : "bg-white text-black/60 border-neu-white hover:border-neu-cyan"
@@ -1727,7 +1785,7 @@ export default function App() {
                     <button 
                       type="submit"
                       disabled={submitting || !selectedReason}
-                      className="w-full bg-neu-blue text-white rounded-2xl py-6 font-extrabold text-xl hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-2xl shadow-neu-blue/20"
+                      className="w-full bg-neu-blue text-white rounded-2xl py-6 font-extrabold text-xl hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-2xl shadow-neu-blue/20 cursor-pointer"
                     >
                       {submitting ? (
                         <Loader2 className="w-8 h-8 animate-spin" />
@@ -1739,6 +1797,7 @@ export default function App() {
                       )}
                     </button>
                   </form>
+                </>
                 )}
 
                 {error && !profile?.isBlocked && (
