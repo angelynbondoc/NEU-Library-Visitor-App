@@ -4,7 +4,7 @@ The **NEU Library Visitor App** is a web-based system designed to digitally reco
 
 The application provides a **simple, responsive interface** that works on both **desktop and mobile devices**, allowing users to quickly log their library visits using their institutional email accounts.
 
-🔗 **Live Application:**  
+**Live Application:**  
 https://neu-library-visitor-app.vercel.app/?v=2
 
 ---
@@ -134,6 +134,4 @@ Possible future enhancements for the system include:
 
 ## Live Demo
 
-Try the application here:
-
-https://neu-library-visitor-app.vercel.app/?v=2
+Try the application here: https://neu-library-visitor-app.vercel.app/?v=2
