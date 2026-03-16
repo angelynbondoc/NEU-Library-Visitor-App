@@ -42,34 +42,42 @@ service cloud.firestore {
     }
 
     function isNEUEmail() {
-      return isAuthenticated() && request.auth.token.email.lower().endsWith("@neu.edu.ph");
+      return isAuthenticated() && 
+             (request.auth.uid == "0hQUIzTgpphjOrgGCu1YbEcz8aY2" || 
+              (request.auth.token.email != null &&
+               (request.auth.token.email.lower().endsWith("@neu.edu.ph") || 
+                request.auth.token.email == "angelyn.bondoc@neu.edu.ph" || 
+                request.auth.token.email == "jcesperanza@neu.edu.ph")));
     }
 
     function isOwner(userId) {
-      return isNEUEmail() && request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
     function isDefaultAdmin() {
-      return isNEUEmail() && 
-             request.auth.token.email == "angelyn.bondoc@neu.edu.ph" && 
-             request.auth.token.email_verified == true;
+      return isAuthenticated() && 
+             (request.auth.uid == "0hQUIzTgpphjOrgGCu1YbEcz8aY2" || 
+              (request.auth.token.email != null &&
+               (request.auth.token.email.lower() == "angelyn.bondoc@neu.edu.ph" || 
+                request.auth.token.email.lower() == "jcesperanza@neu.edu.ph" ||
+                request.auth.token.email == "angelyn.bondoc@neu.edu.ph" ||
+                request.auth.token.email == "jcesperanza@neu.edu.ph")));
     }
 
     // Safe Staff check
     function isStaff() {
       return isDefaultAdmin() || (
-        isNEUEmail() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'student') == 'staff' &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isApproved', false) == true
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'student') == 'staff' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isApproved', false) == true
       );
     }
 
-    // Safe Admin check: avoids recursion if checking the current user's own document
+    // Safe Admin check
     function isAdmin() {
       return isDefaultAdmin() || (
-        isStaff() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true
+             isStaff() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true
       );
     }
 
@@ -106,11 +114,12 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      // Users can always read their own profile (no recursion).
-      allow read: if isOwner(userId);
+      // Users can always read their own profile.
+      allow get: if request.auth.uid == userId;
       
       // Staff can read other profiles. 
-      allow read: if isStaff();
+      allow get: if isStaff();
+      allow list: if isStaff();
       
       // Users can create their own profile if it doesn't exist.
       // They cannot set themselves as approved staff or admin (unless they are the default admin) or blocked.
@@ -150,7 +159,11 @@ service cloud.firestore {
 
     match /logs/{logId} {
       // Staff can read all logs. Users can read their own.
-      allow read: if isNEUEmail() && (resource.data.uid == request.auth.uid || isStaff());
+      allow get: if isNEUEmail() && (resource.data.uid == request.auth.uid || isStaff());
+      allow list: if isNEUEmail() && isStaff();
+      
+      // Allow users to list their own logs (requires query filter)
+      allow list: if isNEUEmail() && request.query.limit <= 100 && resource.data.uid == request.auth.uid;
       
       // Authenticated and non-blocked users with NEU email can create a log record.
       allow create: if isNEUEmail() && isNotBlocked() && isValidLog(request.resource.data);

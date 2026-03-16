@@ -231,7 +231,8 @@ interface LibraryLog {
 type DateFilter = 'today' | 'weekly' | 'monthly' | 'custom';
 
 const REASONS = ["Reading", "Research", "Use of Computer", "Studying"];
-const DEFAULT_ADMIN_EMAIL = "angelyn.bondoc@neu.edu.ph";
+const DEFAULT_ADMIN_EMAILS = ["angelyn.bondoc@neu.edu.ph", "jcesperanza@neu.edu.ph"];
+const isDefaultAdminEmail = (email?: string | null) => !!email && DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
 
 const NEU_LOGO = "https://scontent.fmnl17-6.fna.fbcdn.net/v/t39.30808-6/587748546_122156030186743934_2851142283168601511_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=XcurpbSYAxYQ7kNvwH4Jml7&_nc_oc=AdlaQg5JYJusEkjkJAxBPbop4uek1nntno4w8llnNy84Le6bWNhZpxwv1sGbPDB-nZc&_nc_zt=23&_nc_ht=scontent.fmnl17-6.fna&_nc_gid=1L5oGNhcvxhBfW0XcX5mYA&_nc_ss=8&oh=00_AfzVckmuGO5EBdWEdvI1PLdw-rMUucAl_5AZYPl4tc8a1Q&oe=69BC8A35";
 const LIB_LOGO = NEU_LOGO;
@@ -516,7 +517,7 @@ export default function App() {
             let data = docSnap.data() as UserProfile;
             
             // Force Admin status for Default Admin Email
-            if (data.email === DEFAULT_ADMIN_EMAIL) {
+            if (isDefaultAdminEmail(data.email)) {
               data = { ...data, isAdmin: true, role: 'staff', isApproved: true };
             }
             
@@ -524,7 +525,7 @@ export default function App() {
             setIsNewUser(false);
 
             // Auto-direct Staff to Dashboard if approved
-            if (data.role === 'staff' && (data.isApproved || data.email === DEFAULT_ADMIN_EMAIL) && !hasAutoDirected) {
+            if (data.role === 'staff' && (data.isApproved || isDefaultAdminEmail(data.email)) && !hasAutoDirected) {
               setView('admin');
               setAdminTab('profile');
               setShowSuccessGreeting(true);
@@ -613,7 +614,7 @@ export default function App() {
     setError(null);
 
     const role = userType === 'student' ? 'student' : 'staff';
-    const isDefaultAdmin = user.email === DEFAULT_ADMIN_EMAIL;
+    const isDefaultAdmin = isDefaultAdminEmail(user.email);
 
     const newProfile: UserProfile = {
       uid: user.uid,
@@ -689,13 +690,13 @@ export default function App() {
     const targetUser = allUsers.find(u => u.uid === targetUid);
     
     // Only Default Admin can block/unblock other staff members
-    if (targetUser?.role === 'staff' && profile.email !== DEFAULT_ADMIN_EMAIL) {
+    if (targetUser?.role === 'staff' && !isDefaultAdminEmail(profile.email)) {
       setError("Only the Super Admin can change the block status of staff members.");
       return;
     }
 
     // Cannot block the Default Admin
-    if (targetUser?.email === DEFAULT_ADMIN_EMAIL && !currentStatus) {
+    if (isDefaultAdminEmail(targetUser?.email) && !currentStatus) {
       setError("The Super Admin cannot be blocked.");
       return;
     }
@@ -714,13 +715,13 @@ export default function App() {
     
     // Only Default Admin can demote staff/admins
     const targetUser = allUsers.find(u => u.uid === targetUid);
-    if (targetUser?.role === 'staff' && profile.email !== DEFAULT_ADMIN_EMAIL) {
+    if (targetUser?.role === 'staff' && !isDefaultAdminEmail(profile.email)) {
       setError("Only the Super Admin can demote staff members.");
       return;
     }
 
     // Cannot demote the Default Admin
-    if (targetUser?.email === DEFAULT_ADMIN_EMAIL && newRole === 'student') {
+    if (isDefaultAdminEmail(targetUser?.email) && newRole === 'student') {
       setError("The Super Admin cannot be demoted.");
       return;
     }
@@ -773,13 +774,13 @@ export default function App() {
     const targetUser = allUsers.find(u => u.uid === targetUid);
     
     // Only Default Admin can remove admin privileges from others
-    if (currentStatus && profile.email !== DEFAULT_ADMIN_EMAIL) {
+    if (currentStatus && !isDefaultAdminEmail(profile.email)) {
       setError("Only the Super Admin can remove admin privileges.");
       return;
     }
 
     // Cannot remove admin status from Default Admin
-    if (targetUser?.email === DEFAULT_ADMIN_EMAIL && currentStatus) {
+    if (isDefaultAdminEmail(targetUser?.email) && currentStatus) {
       setError("The Super Admin's privileges cannot be removed.");
       return;
     }
@@ -1145,7 +1146,7 @@ export default function App() {
                 </form>
               </div>
             </motion.div>
-          ) : view === 'admin' && profile?.role === 'staff' && (profile?.isApproved || profile?.email === DEFAULT_ADMIN_EMAIL) ? (
+          ) : view === 'admin' && profile?.role === 'staff' && (profile?.isApproved || isDefaultAdminEmail(profile?.email)) ? (
             /* Admin Dashboard */
             <motion.div 
               key="admin"
@@ -1629,14 +1630,14 @@ export default function App() {
                                 <div className="flex flex-wrap gap-2">
                                   <button
                                     onClick={() => handleToggleBlock(u.uid, !!u.isBlocked)}
-                                    disabled={u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)}
+                                    disabled={isDefaultAdminEmail(u.email) || (u.role === 'staff' && !isDefaultAdminEmail(profile?.email))}
                                     title={u.isBlocked ? "Unblock User" : "Block User"}
                                     className={cn(
                                       "p-2 rounded-xl transition-all",
                                       u.isBlocked 
                                         ? "bg-emerald-500 text-white hover:bg-emerald-600" 
                                         : "bg-red-500 text-white hover:bg-red-600",
-                                      (u.email === DEFAULT_ADMIN_EMAIL || (u.role === 'staff' && profile?.email !== DEFAULT_ADMIN_EMAIL)) && "opacity-20 cursor-not-allowed grayscale"
+                                      (isDefaultAdminEmail(u.email) || (u.role === 'staff' && !isDefaultAdminEmail(profile?.email))) && "opacity-20 cursor-not-allowed grayscale"
                                     )}
                                   >
                                     {u.isBlocked ? <ShieldCheck className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
@@ -1645,7 +1646,7 @@ export default function App() {
                                   {u.role !== 'staff' && (
                                     <button
                                       onClick={() => handleUpdateRole(u.uid, 'staff')}
-                                      disabled={profile?.email !== DEFAULT_ADMIN_EMAIL}
+                                      disabled={!isDefaultAdminEmail(profile?.email)}
                                       title="Promote to Staff"
                                       className="p-2 rounded-xl bg-neu-blue text-white hover:bg-neu-cyan transition-all"
                                     >
@@ -1656,12 +1657,12 @@ export default function App() {
                                   {u.role === 'staff' && (
                                     <button
                                       onClick={() => handleToggleAdmin(u.uid, !!u.isAdmin)}
-                                      disabled={u.email === DEFAULT_ADMIN_EMAIL || (u.isAdmin && profile?.email !== DEFAULT_ADMIN_EMAIL)}
+                                      disabled={isDefaultAdminEmail(u.email) || (u.isAdmin && !isDefaultAdminEmail(profile?.email))}
                                       title={u.isAdmin ? "Remove Admin Privileges" : "Make Administrator"}
                                       className={cn(
                                         "p-2 rounded-xl transition-all",
                                         u.isAdmin ? "bg-neu-gold text-white hover:bg-neu-gold/80" : "bg-neu-white text-neu-gold border border-neu-gold/20 hover:bg-neu-gold/5",
-                                        (u.email === DEFAULT_ADMIN_EMAIL || (u.isAdmin && profile?.email !== DEFAULT_ADMIN_EMAIL)) && "opacity-20 cursor-not-allowed grayscale"
+                                        (isDefaultAdminEmail(u.email) || (u.isAdmin && !isDefaultAdminEmail(profile?.email))) && "opacity-20 cursor-not-allowed grayscale"
                                       )}
                                     >
                                       <ShieldCheck className="w-4 h-4" />
@@ -1687,7 +1688,7 @@ export default function App() {
                 </div>
               )}
             </motion.div>
-          ) : profile?.role === 'staff' && !profile?.isApproved && profile?.email !== DEFAULT_ADMIN_EMAIL ? (
+          ) : profile?.role === 'staff' && !profile?.isApproved && !isDefaultAdminEmail(profile?.email) ? (
             /* Pending Approval View */
             <motion.div
               key="pending"
