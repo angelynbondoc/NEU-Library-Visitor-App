@@ -387,14 +387,17 @@ export default function App() {
     };
     console.error('Firestore Error: ', JSON.stringify(errInfo));
     
-    if (errInfo.error.includes("permission-denied")) {
+    const errMessage = errInfo.error.toLowerCase();
+    if (errMessage.includes("permission") || errMessage.includes("insufficient")) {
       if (profile?.isBlocked) {
-        setError("Access Denied. Please see the Librarian.");
+        setError("Access Denied. Your account has been blocked. Please see the Librarian.");
       } else {
-        setError("Access Denied. Please check your account status.");
+        setError("Access Denied. Please ensure you are using your @neu.edu.ph account and have completed your profile.");
       }
+    } else if (errMessage.includes("offline") || errMessage.includes("network")) {
+      setError("Network error. Please check your internet connection.");
     } else {
-      setError("Database access error. Please try again.");
+      setError(`Error: ${errInfo.error}`);
     }
   };
 

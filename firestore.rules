@@ -44,10 +44,9 @@ service cloud.firestore {
     function isNEUEmail() {
       return isAuthenticated() && 
              (request.auth.uid == "0hQUIzTgpphjOrgGCu1YbEcz8aY2" || 
-              (request.auth.token.email != null &&
-               (request.auth.token.email.lower().endsWith("@neu.edu.ph") || 
-                request.auth.token.email == "angelyn.bondoc@neu.edu.ph" || 
-                request.auth.token.email == "jcesperanza@neu.edu.ph")));
+              (request.auth.token.get('email', '').lower().endsWith("@neu.edu.ph") || 
+               request.auth.token.get('email', '').lower() == "angelyn.bondoc@neu.edu.ph" || 
+               request.auth.token.get('email', '').lower() == "jcesperanza@neu.edu.ph"));
     }
 
     function isOwner(userId) {
@@ -57,11 +56,8 @@ service cloud.firestore {
     function isDefaultAdmin() {
       return isAuthenticated() && 
              (request.auth.uid == "0hQUIzTgpphjOrgGCu1YbEcz8aY2" || 
-              (request.auth.token.email != null &&
-               (request.auth.token.email.lower() == "angelyn.bondoc@neu.edu.ph" || 
-                request.auth.token.email.lower() == "jcesperanza@neu.edu.ph" ||
-                request.auth.token.email == "angelyn.bondoc@neu.edu.ph" ||
-                request.auth.token.email == "jcesperanza@neu.edu.ph")));
+              (request.auth.token.get('email', '').lower() == "angelyn.bondoc@neu.edu.ph" || 
+               request.auth.token.get('email', '').lower() == "jcesperanza@neu.edu.ph"));
     }
 
     // Safe Staff check
@@ -99,9 +95,10 @@ service cloud.firestore {
     }
 
     function isValidLog(data) {
-      return data.keys().hasAll(['uid', 'name', 'college', 'program', 'reason', 'timestamp', 'status']) &&
+      return data.keys().hasAll(['uid', 'name', 'email', 'college', 'program', 'reason', 'timestamp', 'status']) &&
              data.uid == request.auth.uid &&
              data.name is string &&
+             data.email is string &&
              data.college is string &&
              data.program is string &&
              data.reason in ['Reading', 'Research', 'Use of Computer', 'Studying'] &&
