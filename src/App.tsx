@@ -41,6 +41,7 @@ import {
   GraduationCap,
   Search,
   Monitor,
+  Smartphone,
   ChevronDown,
   LayoutDashboard,
   Calendar,
@@ -55,7 +56,9 @@ import {
   FileDown,
   UserX,
   UserCheck,
+  UserMinus,
   Settings,
+  Eye,
   Wifi,
   Printer
 } from 'lucide-react';
@@ -226,6 +229,7 @@ interface LibraryLog {
   status: 'pending' | 'validated' | 'blocked';
   validatedBy?: string;
   validatedAt?: any;
+  isPreview?: boolean;
 }
 
 type DateFilter = 'today' | 'weekly' | 'monthly' | 'custom';
@@ -346,6 +350,7 @@ export default function App() {
   const [onboardingStep, setOnboardingStep] = useState<1 | 2>(1);
   const [userType, setUserType] = useState<'student' | 'faculty' | null>(null);
   const [facultyRole, setFacultyRole] = useState<'admin' | 'employee' | null>(null);
+  const [previewRole, setPreviewRole] = useState<'admin' | 'staff' | 'student' | null>(null);
   const [selectedCollege, setSelectedCollege] = useState('');
   const [selectedProgram, setSelectedProgram] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -401,6 +406,14 @@ export default function App() {
       setError(`Error: ${errInfo.error}`);
     }
   };
+
+  const effectiveProfile = (profile && isDefaultAdminEmail(profile.email) && previewRole) 
+    ? { 
+        ...profile, 
+        role: previewRole === 'student' ? 'student' : 'staff',
+        isAdmin: previewRole === 'admin'
+      } 
+    : profile;
 
   // Test connection
   useEffect(() => {
@@ -667,7 +680,8 @@ export default function App() {
         program: profile.program,
         reason: selectedReason,
         timestamp: serverTimestamp(),
-        status: 'pending'
+        status: 'pending',
+        isPreview: previewRole === 'student'
       });
       
       setShowSuccessGreeting(true);
@@ -834,7 +848,12 @@ export default function App() {
       end: endDate.toLocaleDateString()
     };
 
-    exportToPDF(allLogs, allUsers, dateRange, dateFilter);
+    exportToPDF(
+      allLogs.filter(log => !log.isPreview && !isDefaultAdminEmail(log.email)), 
+      allUsers, 
+      dateRange, 
+      dateFilter
+    );
   };
 
   if (loading) {
@@ -1150,7 +1169,7 @@ export default function App() {
                 </form>
               </div>
             </motion.div>
-          ) : view === 'admin' && profile?.role === 'staff' && (profile?.isApproved || isDefaultAdminEmail(profile?.email)) ? (
+          ) : view === 'admin' && effectiveProfile?.role === 'staff' && (effectiveProfile?.isApproved || isDefaultAdminEmail(effectiveProfile?.email)) ? (
             /* Admin Dashboard */
             <motion.div 
               key="admin"
@@ -1160,11 +1179,13 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-2">
-                  <h1 className="text-4xl font-black text-neu-blue tracking-tight">
-                    {profile.isAdmin ? 'Librarian Dashboard' : 'Staff Dashboard'}
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-4xl font-black text-neu-blue tracking-tight">
+                      {effectiveProfile.isAdmin ? 'Librarian Dashboard' : 'Staff Dashboard'}
+                    </h1>
+                  </div>
                   <p className="text-black/60 font-medium">
-                    {profile.isAdmin ? 'Manage visitors and user accounts.' : 'View visitor analytics and history.'}
+                    {effectiveProfile.isAdmin ? 'Manage visitors and user accounts.' : 'View visitor analytics and history.'}
                   </p>
                 </div>
 
@@ -1190,7 +1211,7 @@ export default function App() {
                       <TrendingUp className="w-4 h-4" />
                       Analytics
                     </button>
-                    {profile.isAdmin && (
+                    {effectiveProfile.isAdmin && (
                       <button
                         onClick={() => setAdminTab('users')}
                         className={cn(
@@ -1239,23 +1260,23 @@ export default function App() {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-neu-blue/5 rounded-full -mr-16 -mt-16 blur-2xl" />
                     <div className="relative z-10">
                       <div className="w-24 h-24 rounded-full border-4 border-neu-white overflow-hidden shadow-lg">
-                        {profile.photoURL ? (
-                          <img src={profile.photoURL} alt={profile.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        {effectiveProfile.photoURL ? (
+                          <img src={effectiveProfile.photoURL} alt={effectiveProfile.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-full h-full bg-neu-blue/10 flex items-center justify-center text-neu-blue text-3xl font-black">
-                            {profile.displayName.charAt(0)}
+                            {effectiveProfile.displayName.charAt(0)}
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="flex-1 relative z-10 space-y-1">
-                      <h2 className="text-3xl font-black text-neu-blue leading-tight">{profile.displayName}</h2>
-                      <p className="text-neu-cyan font-bold text-lg">{profile.program}</p>
+                      <h2 className="text-3xl font-black text-neu-blue leading-tight">{effectiveProfile.displayName}</h2>
+                      <p className="text-neu-cyan font-bold text-lg">{effectiveProfile.program}</p>
                       <p className="text-black/40 font-black text-xs uppercase tracking-widest">FACULTY/STAFF</p>
                     </div>
                     <div className="relative z-10">
                       <span className="bg-neu-gold text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-neu-gold/20">
-                        {profile.isAdmin ? 'ADMINISTRATOR' : 'STAFF'}
+                        {effectiveProfile.isAdmin ? 'ADMINISTRATOR' : 'STAFF'}
                       </span>
                       <button
                         onClick={handleExportPDF}
@@ -1271,6 +1292,56 @@ export default function App() {
                   <div className="text-center space-y-10">
                     <div className="space-y-4">
                       <h3 className="text-5xl font-black text-neu-blue tracking-tight">Welcome Back</h3>
+                      {isDefaultAdminEmail(profile?.email) && (
+                        <div className="flex flex-col items-center gap-3 pt-4">
+                          <span className="text-[10px] font-black text-neu-gold uppercase tracking-[0.3em] flex items-center gap-2">
+                            <Eye className="w-3 h-3" />
+                            View As
+                          </span>
+                          <div className="flex bg-neu-white p-1.5 rounded-2xl border border-neu-gold/20 shadow-sm">
+                            <button 
+                              onClick={() => setPreviewRole('admin')}
+                              className={cn(
+                                "px-6 py-2.5 rounded-xl text-[11px] font-bold uppercase transition-all flex items-center gap-2",
+                                (previewRole === 'admin' || (!previewRole && profile?.isAdmin)) 
+                                  ? "bg-neu-gold text-white shadow-lg shadow-neu-gold/20" 
+                                  : "text-neu-gold hover:bg-neu-gold/5"
+                              )}
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                              Admin
+                            </button>
+                            <button 
+                              onClick={() => setPreviewRole('staff')}
+                              className={cn(
+                                "px-6 py-2.5 rounded-xl text-[11px] font-bold uppercase transition-all flex items-center gap-2",
+                                previewRole === 'staff' 
+                                  ? "bg-neu-gold text-white shadow-lg shadow-neu-gold/20" 
+                                  : "text-neu-gold hover:bg-neu-gold/5"
+                              )}
+                            >
+                              <UsersIcon className="w-4 h-4" />
+                              Staff
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setPreviewRole('student');
+                                setView('visitor');
+                              }}
+                              className={cn(
+                                "px-6 py-2.5 rounded-xl text-[11px] font-bold uppercase transition-all flex items-center gap-2",
+                                previewRole === 'student' 
+                                  ? "bg-neu-gold text-white shadow-lg shadow-neu-gold/20" 
+                                  : "text-neu-gold hover:bg-neu-gold/5"
+                              )}
+                            >
+                              <GraduationCap className="w-4 h-4" />
+                              Student
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-black/40 font-medium italic">Preview mode allows you to experience the app from different perspectives.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1305,7 +1376,11 @@ export default function App() {
 
               {/* Stats Grid */}
               {(() => {
-                const validatedLogs = allLogs.filter(log => log.status === 'validated');
+                const validatedLogs = allLogs.filter(log => 
+                  log.status === 'validated' && 
+                  !log.isPreview && 
+                  !isDefaultAdminEmail(log.email)
+                );
                 return (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-neu-blue text-white p-8 rounded-[32px] shadow-xl shadow-neu-blue/20 relative overflow-hidden group">
@@ -1400,8 +1475,11 @@ export default function App() {
                     <tbody className="divide-y divide-neu-blue/5">
                       {allLogs
                         .filter(log => 
-                          log.name.toLowerCase().includes(adminSearchTerm.toLowerCase()) ||
-                          (log.email || '').toLowerCase().includes(adminSearchTerm.toLowerCase())
+                          !log.isPreview && 
+                          !isDefaultAdminEmail(log.email) && (
+                            log.name.toLowerCase().includes(adminSearchTerm.toLowerCase()) ||
+                            (log.email || '').toLowerCase().includes(adminSearchTerm.toLowerCase())
+                          )
                         )
                         .map((log) => (
                           <tr key={log.id} className="hover:bg-neu-blue/5 transition-colors group">
@@ -1489,7 +1567,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {!adminLogsLoading && allLogs.length === 0 && (
+                  {!adminLogsLoading && allLogs.filter(l => !l.isPreview && !isDefaultAdminEmail(l.email)).length === 0 && (
                     <div className="p-20 text-center space-y-4">
                       <div className="bg-neu-white w-20 h-20 rounded-full flex items-center justify-center mx-auto">
                         <Search className="w-8 h-8 text-black/10" />
@@ -1659,18 +1737,32 @@ export default function App() {
                                   )}
 
                                   {u.role === 'staff' && (
-                                    <button
-                                      onClick={() => handleToggleAdmin(u.uid, !!u.isAdmin)}
-                                      disabled={isDefaultAdminEmail(u.email) || (u.isAdmin && !isDefaultAdminEmail(profile?.email))}
-                                      title={u.isAdmin ? "Remove Admin Privileges" : "Make Administrator"}
-                                      className={cn(
-                                        "p-2 rounded-xl transition-all",
-                                        u.isAdmin ? "bg-neu-gold text-white hover:bg-neu-gold/80" : "bg-neu-white text-neu-gold border border-neu-gold/20 hover:bg-neu-gold/5",
-                                        (isDefaultAdminEmail(u.email) || (u.isAdmin && !isDefaultAdminEmail(profile?.email))) && "opacity-20 cursor-not-allowed grayscale"
-                                      )}
-                                    >
-                                      <ShieldCheck className="w-4 h-4" />
-                                    </button>
+                                    <>
+                                      <button
+                                        onClick={() => handleToggleAdmin(u.uid, !!u.isAdmin)}
+                                        disabled={isDefaultAdminEmail(u.email) || (u.isAdmin && !isDefaultAdminEmail(profile?.email))}
+                                        title={u.isAdmin ? "Remove Admin Privileges" : "Make Administrator"}
+                                        className={cn(
+                                          "p-2 rounded-xl transition-all",
+                                          u.isAdmin ? "bg-neu-gold text-white hover:bg-neu-gold/80" : "bg-neu-white text-neu-gold border border-neu-gold/20 hover:bg-neu-gold/5",
+                                          (isDefaultAdminEmail(u.email) || (u.isAdmin && !isDefaultAdminEmail(profile?.email))) && "opacity-20 cursor-not-allowed grayscale"
+                                        )}
+                                      >
+                                        <ShieldCheck className="w-4 h-4" />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleUpdateRole(u.uid, 'student')}
+                                        disabled={isDefaultAdminEmail(u.email) || !isDefaultAdminEmail(profile?.email)}
+                                        title="Demote to Student"
+                                        className={cn(
+                                          "p-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-all",
+                                          (isDefaultAdminEmail(u.email) || !isDefaultAdminEmail(profile?.email)) && "opacity-20 cursor-not-allowed grayscale"
+                                        )}
+                                      >
+                                        <UserMinus className="w-4 h-4" />
+                                      </button>
+                                    </>
                                   )}
 
                                   {u.role === 'staff' && !u.isApproved && (
@@ -1707,7 +1799,7 @@ export default function App() {
                 <div className="space-y-4">
                   <h2 className="text-3xl font-black text-neu-blue leading-tight">Approval Pending</h2>
                   <p className="text-black/60 font-medium leading-relaxed">
-                    Your request for <span className="text-neu-blue font-bold">{profile.isAdmin ? 'Administrator' : 'Employee'}</span> access has been submitted.
+                    Your request for <span className="text-neu-blue font-bold">{effectiveProfile?.isAdmin ? 'Administrator' : 'Employee'}</span> access has been submitted.
                   </p>
                   <div className="bg-neu-white p-4 rounded-2xl border border-neu-blue/5 text-left">
                     <p className="text-[10px] font-black text-neu-blue/40 uppercase tracking-widest mb-2">Next Steps</p>
@@ -1737,17 +1829,29 @@ export default function App() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-neu-yellow/10 rounded-full -mr-16 -mt-16 blur-3xl" />
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-neu-cyan/10 rounded-full -ml-16 -mb-16 blur-3xl" />
                 
+                {isDefaultAdminEmail(profile?.email) && (
+                  <button 
+                    onClick={() => {
+                      setPreviewRole('admin');
+                      setView('admin');
+                    }}
+                    className="absolute top-4 right-4 bg-neu-gold text-white px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-neu-gold/90 transition-all shadow-lg shadow-neu-gold/20 z-20"
+                  >
+                    Exit Preview
+                  </button>
+                )}
+
                 <img 
-                  src={profile?.photoURL || `https://ui-avatars.com/api/?name=${profile?.displayName}`} 
+                  src={effectiveProfile?.photoURL || `https://ui-avatars.com/api/?name=${effectiveProfile?.displayName}`} 
                   alt="Profile" 
                   className="w-24 h-24 rounded-full border-4 border-neu-white relative z-10 shadow-md"
                 />
                 <div className="text-center md:text-left space-y-1 relative z-10">
-                  <h2 className="text-3xl font-bold text-neu-blue">{profile?.displayName}</h2>
-                  <p className="text-neu-cyan font-bold text-lg">{profile?.program}</p>
-                  <p className="text-xs text-black/40 tracking-widest uppercase font-bold">{profile?.college}</p>
+                  <h2 className="text-3xl font-bold text-neu-blue">{effectiveProfile?.displayName}</h2>
+                  <p className="text-neu-cyan font-bold text-lg">{effectiveProfile?.program}</p>
+                  <p className="text-xs text-black/40 tracking-widest uppercase font-bold">{effectiveProfile?.college}</p>
                 </div>
-                {profile?.isAdmin && (
+                {effectiveProfile?.isAdmin && (
                   <div className="md:ml-auto bg-neu-gold text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest relative z-10 shadow-sm">
                     Administrator
                   </div>
