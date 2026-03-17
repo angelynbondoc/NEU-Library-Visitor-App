@@ -888,7 +888,7 @@ export default function App() {
                 Welcome to <br /> NEU Library!
               </h1>
               <p className="text-2xl font-medium opacity-80">
-                {profile?.role === 'staff' 
+                {effectiveProfile?.role === 'staff' 
                   ? "Your dedication powers our community's learning. Let's make today count!" 
                   : "Enjoy your stay and happy learning."}
               </p>
