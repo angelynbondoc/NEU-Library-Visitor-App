@@ -43,9 +43,8 @@ service cloud.firestore {
 
     function isNEUEmail() {
       return isAuthenticated() && 
-             (request.auth.uid == "0hQUIzTgpphjOrgGCu1YbEcz8aY2" || 
-              request.auth.token.get('email', '').lower().endsWith("@neu.edu.ph") ||
-              (request.auth.token.email != null && request.auth.token.email.lower().endsWith("@neu.edu.ph")));
+             request.auth.token.email != null && 
+             request.auth.token.email.lower().matches(".*neu\\.edu\\.ph$");
     }
 
     function isOwner(userId) {
@@ -55,9 +54,9 @@ service cloud.firestore {
     function isDefaultAdmin() {
       return isAuthenticated() && 
              (request.auth.uid == "0hQUIzTgpphjOrgGCu1YbEcz8aY2" || 
-              (request.auth.token.get('email', '') != null && 
-               (request.auth.token.get('email', '').lower() == "angelyn.bondoc@neu.edu.ph" || 
-                request.auth.token.get('email', '').lower() == "jcesperanza@neu.edu.ph")));
+              (request.auth.token.email != null && 
+               (request.auth.token.email.lower() == "angelyn.bondoc@neu.edu.ph" || 
+                request.auth.token.email.lower() == "jcesperanza@neu.edu.ph")));
     }
 
     // Safe Staff check
@@ -163,7 +162,7 @@ service cloud.firestore {
       allow list: if isNEUEmail() && request.query.limit <= 100 && resource.data.uid == request.auth.uid;
       
       // Authenticated and non-blocked users with NEU email can create a log record.
-      allow create: if isNEUEmail();
+      allow create: if isNEUEmail() && isNotBlocked();
       
       // Staff can validate or block logs.
       allow update: if isStaff() && 
