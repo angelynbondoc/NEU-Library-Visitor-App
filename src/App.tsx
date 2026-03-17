@@ -388,6 +388,7 @@ export default function App() {
     console.error('Firestore Error: ', JSON.stringify(errInfo));
     
     const errMessage = errInfo.error.toLowerCase();
+    console.error("Detailed Firestore Error:", errInfo);
     if (errMessage.includes("permission") || errMessage.includes("insufficient")) {
       if (profile?.isBlocked) {
         setError("Access Denied. Your account has been blocked. Please see the Librarian.");
