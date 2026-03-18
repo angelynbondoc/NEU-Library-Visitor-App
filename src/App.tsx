@@ -1920,63 +1920,155 @@ export default function App() {
               </div>
 
               {/* Action Area */}
-              <div className="max-w-md mx-auto text-center space-y-8">
+              <div className="max-w-4xl mx-auto space-y-12">
                 {profile?.isBlocked ? (
-                  <div className="bg-red-50 text-red-600 p-8 rounded-[32px] border-2 border-red-200 space-y-4">
+                  <div className="max-w-md mx-auto bg-red-50 text-red-600 p-8 rounded-[32px] border-2 border-red-200 space-y-4 text-center">
                     <AlertCircle className="w-16 h-16 mx-auto" />
                     <h4 className="text-2xl font-bold">Access Denied</h4>
                     <p className="text-lg font-medium">Please see the Librarian for assistance.</p>
                   </div>
                 ) : (
-                  <>
-                    <div className="space-y-4">
-                      <h3 className="text-4xl font-extrabold text-neu-blue">Welcome Back</h3>
-                      <p className="text-lg text-black/60 font-medium">Ready to enter the library? Select your reason below.</p>
-                    </div>
-                    <form onSubmit={handleLibraryEntry} className="space-y-8">
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                      {REASONS_WITH_ICONS.map((item) => (
-                        <button
-                          key={item.name}
-                          type="button"
-                          onClick={() => setSelectedReason(item.name)}
-                          className={cn(
-                            "p-5 rounded-[24px] border-2 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer text-center h-full min-h-[140px]",
-                            selectedReason === item.name 
-                              ? "bg-neu-blue text-white border-neu-blue shadow-xl shadow-neu-blue/20 scale-[1.02]" 
-                              : "bg-white text-black/60 border-neu-white hover:border-neu-cyan hover:shadow-lg hover:shadow-neu-cyan/5"
-                          )}
-                        >
-                          <div className={cn(
-                            "p-3 rounded-2xl transition-colors",
-                            selectedReason === item.name ? "bg-white/20" : "bg-neu-blue/5 text-neu-blue"
-                          )}>
-                            {item.icon}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                    {/* Left Column: Stats & Info */}
+                    <div className="lg:col-span-4 space-y-8">
+                      <div className="space-y-4 text-center lg:text-left">
+                        <h3 className="text-4xl font-extrabold text-neu-blue">Welcome Back</h3>
+                        <p className="text-lg text-black/60 font-medium leading-relaxed">Ready to enter the library? Select your reason below.</p>
+                      </div>
+
+                      {/* Top Reasons Stats for Students */}
+                      <div className="bg-white p-6 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5">
+                        <div className="flex items-center justify-between mb-6">
+                          <div className="space-y-1">
+                            <h4 className="font-bold text-neu-blue">Library Activity</h4>
+                            <p className="text-[10px] text-black/40 font-black uppercase tracking-widest">Top Reasons for Visit</p>
                           </div>
-                          <span className="text-sm font-bold leading-tight px-2 break-words w-full">
-                            {item.name}
-                          </span>
-                        </button>
-                      ))}
+                          <TrendingUp className="w-4 h-4 text-neu-gold" />
+                        </div>
+                        
+                        <div className="space-y-4">
+                          {(() => {
+                            const validatedLogs = allLogs.filter(log => !log.isPreview && !isDefaultAdminEmail(log.email));
+                            const reasonCounts: Record<string, number> = {};
+                            validatedLogs.forEach(log => {
+                              reasonCounts[log.reason] = (reasonCounts[log.reason] || 0) + 1;
+                            });
+                            
+                            const topReasons = Object.entries(reasonCounts)
+                              .sort(([, a], [, b]) => b - a)
+                              .slice(0, 3);
+
+                            if (topReasons.length === 0) {
+                              return <p className="text-[10px] text-black/40 font-medium italic">No activity recorded yet.</p>;
+                            }
+
+                            return topReasons.map(([reason, count]) => (
+                              <div key={reason} className="space-y-1.5">
+                                <div className="flex justify-between text-[10px] font-bold">
+                                  <span className="text-neu-blue truncate max-w-[120px]">{reason}</span>
+                                  <span className="text-neu-gold">{count}</span>
+                                </div>
+                                <div className="h-1.5 bg-neu-white rounded-full overflow-hidden">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(count / validatedLogs.length) * 100}%` }}
+                                    className="h-full bg-neu-cyan"
+                                  />
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+
+                      <div className="bg-neu-blue text-white p-6 rounded-[32px] shadow-xl shadow-neu-blue/20 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl group-hover:scale-110 transition-transform" />
+                        <div className="relative z-10 space-y-2">
+                          <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Total Visitors Today</p>
+                          <h4 className="text-4xl font-black">
+                            {allLogs.filter(l => {
+                              const today = new Date();
+                              const logDate = l.timestamp?.toDate ? l.timestamp.toDate() : new Date(l.timestamp);
+                              return logDate.toDateString() === today.toDateString() && !l.isPreview && !isDefaultAdminEmail(l.email);
+                            }).length}
+                          </h4>
+                        </div>
+                      </div>
                     </div>
 
-                    <button 
-                      type="submit"
-                      disabled={submitting || !selectedReason}
-                      className="w-full bg-neu-blue text-white rounded-2xl py-6 font-extrabold text-xl hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-2xl shadow-neu-blue/20 cursor-pointer"
-                    >
-                      {submitting ? (
-                        <Loader2 className="w-8 h-8 animate-spin" />
+                    {/* Right Column: Entry Form */}
+                    <div className="lg:col-span-8">
+                      {effectiveProfile?.role === 'student' ? (
+                        <form onSubmit={handleLibraryEntry} className="space-y-8">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {REASONS_WITH_ICONS.map((item) => (
+                              <button
+                                key={item.name}
+                                type="button"
+                                onClick={() => setSelectedReason(item.name)}
+                                className={cn(
+                                  "p-6 rounded-[32px] border-2 transition-all flex flex-col items-center justify-center gap-4 cursor-pointer text-center h-full min-h-[160px] group",
+                                  selectedReason === item.name 
+                                    ? "bg-neu-blue text-white border-neu-blue shadow-2xl shadow-neu-blue/20 scale-[1.02]" 
+                                    : "bg-white text-black/60 border-neu-white hover:border-neu-cyan hover:shadow-xl hover:shadow-neu-cyan/5"
+                                )}
+                              >
+                                <div className={cn(
+                                  "p-4 rounded-2xl transition-all duration-300 group-hover:scale-110",
+                                  selectedReason === item.name ? "bg-white/20" : "bg-neu-blue/5 text-neu-blue"
+                                )}>
+                                  {item.icon}
+                                </div>
+                                <span className="text-sm font-bold leading-tight px-2 break-words w-full">
+                                  {item.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+
+                          <button 
+                            type="submit"
+                            disabled={submitting || !selectedReason}
+                            className="w-full bg-neu-blue text-white rounded-[32px] py-8 font-black text-2xl hover:bg-neu-cyan transition-all disabled:opacity-50 flex items-center justify-center gap-4 shadow-2xl shadow-neu-blue/20 cursor-pointer group"
+                          >
+                            {submitting ? (
+                              <Loader2 className="w-8 h-8 animate-spin" />
+                            ) : (
+                              <>
+                                <Library className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                                <span>Register Entry</span>
+                              </>
+                            )}
+                          </button>
+                        </form>
                       ) : (
-                        <>
-                          <Library className="w-8 h-8" />
-                          <span>Register Entry</span>
-                        </>
+                        <div className="bg-white p-12 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 text-center space-y-6">
+                          <div className="w-20 h-20 bg-neu-gold/10 rounded-full flex items-center justify-center mx-auto">
+                            <ShieldCheck className="w-10 h-10 text-neu-gold" />
+                          </div>
+                          <div className="space-y-2">
+                            <h4 className="text-2xl font-bold text-neu-blue">Administrative Access</h4>
+                            <p className="text-black/60 font-medium leading-relaxed">
+                              As a member of the <span className="text-neu-gold font-bold uppercase tracking-wider">{effectiveProfile?.role}</span>, 
+                              you do not need to register library entries. Your access is automatically granted.
+                            </p>
+                          </div>
+                          {isDefaultAdminEmail(profile?.email) && (
+                            <button
+                              onClick={() => {
+                                setPreviewRole('admin');
+                                setView('admin');
+                              }}
+                              className="bg-neu-blue text-white px-8 py-4 rounded-2xl font-bold hover:bg-neu-cyan transition-all shadow-lg shadow-neu-blue/20"
+                            >
+                              Return to Dashboard
+                            </button>
+                          )}
+                        </div>
                       )}
-                    </button>
-                  </form>
-                </>
-                )}
+                    </div>
+              </div>
+            )}
 
                 {error && !profile?.isBlocked && (
                   <p className="text-red-500 text-sm font-bold">{error}</p>
