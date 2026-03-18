@@ -234,7 +234,18 @@ interface LibraryLog {
 
 type DateFilter = 'today' | 'weekly' | 'monthly' | 'custom';
 
-const REASONS = ["Reading", "Research", "Use of Computer", "Studying"];
+const REASONS = [
+  "Reading", 
+  "Research", 
+  "Studying", 
+  "Use of Computer", 
+  "Printing/Photocopying", 
+  "Borrowing/Returning Books", 
+  "Group Study", 
+  "WiFi Access", 
+  "Visiting the NEU Museum", 
+  "More"
+];
 const DEFAULT_ADMIN_EMAILS = ["angelyn.bondoc@neu.edu.ph", "jcesperanza@neu.edu.ph"];
 const isDefaultAdminEmail = (email?: string | null) => !!email && DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
 
@@ -1396,12 +1407,54 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* Top Reasons Breakdown */}
+                    <div className="bg-white p-8 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="space-y-1">
+                          <h3 className="text-xl font-bold text-neu-blue">Top Reasons</h3>
+                          <p className="text-xs text-black/40 font-medium">Most common purposes for visits.</p>
+                        </div>
+                        <BookOpen className="w-5 h-5 text-neu-gold" />
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {(() => {
+                          const reasonCounts: Record<string, number> = {};
+                          validatedLogs.forEach(log => {
+                            reasonCounts[log.reason] = (reasonCounts[log.reason] || 0) + 1;
+                          });
+                          
+                          return Object.entries(reasonCounts)
+                            .sort(([, a], [, b]) => b - a)
+                            .slice(0, 3)
+                            .map(([reason, count]) => (
+                              <div key={reason} className="space-y-2">
+                                <div className="flex justify-between text-sm font-bold">
+                                  <span className="text-neu-blue truncate max-w-[140px]">{reason}</span>
+                                  <span className="text-neu-gold">{count}</span>
+                                </div>
+                                <div className="h-2 bg-neu-white rounded-full overflow-hidden">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(count / validatedLogs.length) * 100}%` }}
+                                    className="h-full bg-neu-cyan"
+                                  />
+                                </div>
+                              </div>
+                            ));
+                        })()}
+                        {validatedLogs.length === 0 && (
+                          <p className="text-center py-4 text-black/30 font-medium text-sm italic">No data available.</p>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Top Colleges Breakdown */}
-                    <div className="md:col-span-2 bg-white p-8 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 flex flex-col justify-between">
+                    <div className="bg-white p-8 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-6">
                         <div className="space-y-1">
                           <h3 className="text-xl font-bold text-neu-blue">Top Colleges</h3>
-                          <p className="text-xs text-black/40 font-medium">Distribution of validated visitors by department.</p>
+                          <p className="text-xs text-black/40 font-medium">Distribution by department.</p>
                         </div>
                         <TrendingUp className="w-5 h-5 text-neu-gold" />
                       </div>
@@ -1419,7 +1472,7 @@ export default function App() {
                             .map(([college, count]) => (
                               <div key={college} className="space-y-2">
                                 <div className="flex justify-between text-sm font-bold">
-                                  <span className="text-neu-blue truncate max-w-[200px]">{college}</span>
+                                  <span className="text-neu-blue truncate max-w-[140px]">{college}</span>
                                   <span className="text-neu-gold">{count}</span>
                                 </div>
                                 <div className="h-2 bg-neu-white rounded-full overflow-hidden">
@@ -1433,7 +1486,7 @@ export default function App() {
                             ));
                         })()}
                         {validatedLogs.length === 0 && (
-                          <p className="text-center py-4 text-black/30 font-medium text-sm italic">No validated entries for this period.</p>
+                          <p className="text-center py-4 text-black/30 font-medium text-sm italic">No data available.</p>
                         )}
                       </div>
                     </div>
@@ -1873,7 +1926,7 @@ export default function App() {
                       <p className="text-lg text-black/60 font-medium">Ready to enter the library? Select your reason below.</p>
                     </div>
                     <form onSubmit={handleLibraryEntry} className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                       {REASONS.map((reason) => (
                         <button
                           key={reason}
