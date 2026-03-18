@@ -60,7 +60,13 @@ import {
   Settings,
   Eye,
   Wifi,
-  Printer
+  Printer,
+  BookMarked,
+  Laptop,
+  Users2,
+  Landmark,
+  MoreHorizontal,
+  PenTool
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -234,18 +240,20 @@ interface LibraryLog {
 
 type DateFilter = 'today' | 'weekly' | 'monthly' | 'custom';
 
-const REASONS = [
-  "Reading", 
-  "Research", 
-  "Studying", 
-  "Use of Computer", 
-  "Printing/Photocopying", 
-  "Borrowing/Returning Books", 
-  "Group Study", 
-  "WiFi Access", 
-  "Visiting the NEU Museum", 
-  "More"
+const REASONS_WITH_ICONS = [
+  { name: "Reading", icon: <BookOpen className="w-6 h-6" /> },
+  { name: "Research", icon: <Search className="w-6 h-6" /> },
+  { name: "Studying", icon: <PenTool className="w-6 h-6" /> },
+  { name: "Use of Computer", icon: <Laptop className="w-6 h-6" /> },
+  { name: "Printing/Photocopying", icon: <Printer className="w-6 h-6" /> },
+  { name: "Borrowing/Returning Books", icon: <BookMarked className="w-6 h-6" /> },
+  { name: "Group Study", icon: <Users2 className="w-6 h-6" /> },
+  { name: "WiFi Access", icon: <Wifi className="w-6 h-6" /> },
+  { name: "Visiting the NEU Museum", icon: <Landmark className="w-6 h-6" /> },
+  { name: "More", icon: <MoreHorizontal className="w-6 h-6" /> }
 ];
+
+const REASONS = REASONS_WITH_ICONS.map(r => r.name);
 const DEFAULT_ADMIN_EMAILS = ["angelyn.bondoc@neu.edu.ph", "jcesperanza@neu.edu.ph"];
 const isDefaultAdminEmail = (email?: string | null) => !!email && DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
 
@@ -1927,19 +1935,27 @@ export default function App() {
                     </div>
                     <form onSubmit={handleLibraryEntry} className="space-y-8">
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                      {REASONS.map((reason) => (
+                      {REASONS_WITH_ICONS.map((item) => (
                         <button
-                          key={reason}
+                          key={item.name}
                           type="button"
-                          onClick={() => setSelectedReason(reason)}
+                          onClick={() => setSelectedReason(item.name)}
                           className={cn(
-                            "p-6 rounded-2xl border-2 transition-all text-lg font-bold flex items-center justify-center gap-3 cursor-pointer",
-                            selectedReason === reason 
-                              ? "bg-neu-blue text-white border-neu-blue shadow-lg shadow-neu-blue/20" 
-                              : "bg-white text-black/60 border-neu-white hover:border-neu-cyan"
+                            "p-5 rounded-[24px] border-2 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer text-center h-full min-h-[140px]",
+                            selectedReason === item.name 
+                              ? "bg-neu-blue text-white border-neu-blue shadow-xl shadow-neu-blue/20 scale-[1.02]" 
+                              : "bg-white text-black/60 border-neu-white hover:border-neu-cyan hover:shadow-lg hover:shadow-neu-cyan/5"
                           )}
                         >
-                          {reason}
+                          <div className={cn(
+                            "p-3 rounded-2xl transition-colors",
+                            selectedReason === item.name ? "bg-white/20" : "bg-neu-blue/5 text-neu-blue"
+                          )}>
+                            {item.icon}
+                          </div>
+                          <span className="text-sm font-bold leading-tight px-2 break-words w-full">
+                            {item.name}
+                          </span>
                         </button>
                       ))}
                     </div>
