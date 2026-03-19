@@ -1928,76 +1928,13 @@ export default function App() {
                     <p className="text-lg font-medium">Please see the Librarian for assistance.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                    {/* Left Column: Stats & Info */}
-                    <div className="lg:col-span-4 space-y-8">
-                      <div className="space-y-4 text-center lg:text-left">
-                        <h3 className="text-4xl font-extrabold text-neu-blue">Welcome Back</h3>
-                        <p className="text-lg text-black/60 font-medium leading-relaxed">Ready to enter the library? Select your reason below.</p>
-                      </div>
-
-                      {/* Top Reasons Stats for Students */}
-                      <div className="bg-white p-6 rounded-[32px] border border-neu-blue/5 shadow-xl shadow-neu-blue/5">
-                        <div className="flex items-center justify-between mb-6">
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-neu-blue">Library Activity</h4>
-                            <p className="text-[10px] text-black/40 font-black uppercase tracking-widest">Top Reasons for Visit</p>
-                          </div>
-                          <TrendingUp className="w-4 h-4 text-neu-gold" />
-                        </div>
-                        
-                        <div className="space-y-4">
-                          {(() => {
-                            const validatedLogs = allLogs.filter(log => !log.isPreview && !isDefaultAdminEmail(log.email));
-                            const reasonCounts: Record<string, number> = {};
-                            validatedLogs.forEach(log => {
-                              reasonCounts[log.reason] = (reasonCounts[log.reason] || 0) + 1;
-                            });
-                            
-                            const topReasons = Object.entries(reasonCounts)
-                              .sort(([, a], [, b]) => b - a)
-                              .slice(0, 3);
-
-                            if (topReasons.length === 0) {
-                              return <p className="text-[10px] text-black/40 font-medium italic">No activity recorded yet.</p>;
-                            }
-
-                            return topReasons.map(([reason, count]) => (
-                              <div key={reason} className="space-y-1.5">
-                                <div className="flex justify-between text-[10px] font-bold">
-                                  <span className="text-neu-blue truncate max-w-[120px]">{reason}</span>
-                                  <span className="text-neu-gold">{count}</span>
-                                </div>
-                                <div className="h-1.5 bg-neu-white rounded-full overflow-hidden">
-                                  <motion.div 
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${(count / validatedLogs.length) * 100}%` }}
-                                    className="h-full bg-neu-cyan"
-                                  />
-                                </div>
-                              </div>
-                            ));
-                          })()}
-                        </div>
-                      </div>
-
-                      <div className="bg-neu-blue text-white p-6 rounded-[32px] shadow-xl shadow-neu-blue/20 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl group-hover:scale-110 transition-transform" />
-                        <div className="relative z-10 space-y-2">
-                          <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Total Visitors Today</p>
-                          <h4 className="text-4xl font-black">
-                            {allLogs.filter(l => {
-                              const today = new Date();
-                              const logDate = l.timestamp?.toDate ? l.timestamp.toDate() : new Date(l.timestamp);
-                              return logDate.toDateString() === today.toDateString() && !l.isPreview && !isDefaultAdminEmail(l.email);
-                            }).length}
-                          </h4>
-                        </div>
-                      </div>
+                  <div className="space-y-12">
+                    <div className="text-center space-y-4">
+                      <h3 className="text-4xl font-extrabold text-neu-blue">Welcome Back</h3>
+                      <p className="text-lg text-black/60 font-medium leading-relaxed">Ready to enter the library? Select your reason below.</p>
                     </div>
 
-                    {/* Right Column: Entry Form */}
-                    <div className="lg:col-span-8">
+                    <div className="max-w-3xl mx-auto">
                       {effectiveProfile?.role === 'student' ? (
                         <form onSubmit={handleLibraryEntry} className="space-y-8">
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -2067,8 +2004,8 @@ export default function App() {
                         </div>
                       )}
                     </div>
-              </div>
-            )}
+                  </div>
+                )}
 
                 {error && !profile?.isBlocked && (
                   <p className="text-red-500 text-sm font-bold">{error}</p>
