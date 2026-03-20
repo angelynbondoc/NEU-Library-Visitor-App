@@ -1,44 +1,69 @@
 # NEU Library Visitor App
 
-**Modern, responsive visitor logging system for New Era University (NEU) Library**  
-Secure check-in using **NEU institutional Google accounts** (@neu.edu.ph). Built with React, Firebase Authentication + Firestore, and Tailwind CSS. Mobile-friendly UI.
+**Modern, responsive digital visitor logging system for New Era University Library**
 
-**Live Demo:** https://neu-library-visitor-app.vercel.app
+Secure check-in using **NEU institutional Google accounts** (@neu.edu.ph).  
+
+🔗 **Live Application**  
+https://neu-library-visitor-app.vercel.app/?v=2
 
 ---
 
-## Features
+## System Overview
 
-### User Types & Flows
-- **Students**  
-  - One-time profile setup: Choose **College → Program** (dependent dropdowns)  
-  - Every visit: Select reason (`Reading`, `Research`, `Computer Use`, `Studying`, etc.)  
-  - Shows: “Welcome to NEU Library!”
+The **NEU Library Visitor App** aims to replaces the traditional paper-based visitor logbook with a clean, digital platform.  
+It allows students, faculty members, and employees to quickly log their library visits while giving library staff real-time usage insights and visitor management tools.
 
-- **Faculty / Employees**  
-  - One-time choice: **Faculty Member** or **Employee**  
-  - No reason required → instant welcome → dashboard
+Main goals:
+- Digitize visitor records
+- Improve tracking and monitoring of library usage
+- Provide useful statistics for library administrators
+- Streamline the check-in process
 
-- **Admins** (subset of Faculty/Employees with `isAdmin: true`)  
-  - Full control: view stats, search logs, block users
+---
 
-### Dashboards
-**Admin Dashboard**  
-- Real-time **Today's Visitors** cards (total count + top 3 colleges breakdown)
-- Export the stats as PDF 
-- Searchable visit history table (filter by name/email)  
-- Date filters: Today · Last 7 days · This Month · Custom range  
-- **User Management**: list all users + Block / Unblock toggle (real-time enforcement)
+## Key Features
 
-**Employee Dashboard** (non-admin faculty/employees)  
-- Same stats cards, history table, and date filters  
-- **Read-only** — no blocking or user management
-- Export the stats as PDF
+### Authentication & First-time Registration
+- Sign in with **NEU Google institutional email** (@neu.edu.ph)
+- **First-time users** choose their role and affiliation:
+  - **Student** → select College + Program (dependent dropdowns)
+  - **Faculty / Employee** → choose type (Faculty Member / Employee)  
+    → Admins are marked manually via `isAdmin: true` in Firestore
+- Returning users skip setup
 
-### Security & Real-time
-- Google Sign-In restricted to @neu.edu.ph domain  
-- Firestore real-time listeners → blocked users can't log visits  
-- Role-based access (`role` + `isAdmin` fields)
+### Visit Logging
+- **Students**: select reason for visit  
+  (Reading, Research, Studying, Using computers, Other…)
+- **Faculty / Employees / Admins**: no reason required → instant welcome
+- After logging → greeting message:  
+  **“Welcome to NEU Library!”**
+
+### Dashboards & Statistics
+
+**Admin Dashboard** (full access)
+- Real-time **Today's Visitors** cards  
+  (total count + breakdown by top 3 colleges)
+- Searchable visit history table (filter by name or email)
+- Date filters:  
+  • Today  
+  • Last 7 days  
+  • This Month  
+  • Custom date range
+- **User Management** section  
+  → List all registered users  
+  → Block / Unblock toggle (real-time enforcement)
+- Export statistics as PDF
+
+**Employee / Faculty Dashboard** (read-only)
+- Same statistics cards, history table and date filters
+- **No** user blocking or management features
+- Export statistics as PDF
+
+### Security
+- Google Sign-In restricted to @neu.edu.ph domain
+- Real-time Firestore listener prevents blocked users from logging visits
+- Role-based access control (`role` + `isAdmin` fields)
 
 ---
 
@@ -57,5 +82,5 @@ graph TD
     H -->|No| J{Is Student?}
     J -->|Yes| K[Select Reason → Log Visit → Welcome]
     J -->|No| L[Welcome → Dashboard]
-    L --> M[Admin? → Full Dashboard with Block]
-    L --> N[Employee → Read-only Stats]
+    L --> M[Admin? → Full Dashboard with Block & Export]
+    L --> N[Employee → Read-only Stats + Export]
