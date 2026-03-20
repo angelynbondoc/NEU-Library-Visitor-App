@@ -4,7 +4,7 @@
 
 Secure check-in using **NEU institutional Google accounts** (@neu.edu.ph).  
 
-🔗 **Live Application**  
+**Live Application**  
 https://neu-library-visitor-app.vercel.app/?v=2
 
 ---
