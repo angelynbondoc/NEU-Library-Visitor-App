@@ -67,7 +67,7 @@ Main goals:
 
 ---
 
-## 📋 User Journey
+## User Journey
 
 ```mermaid
 graph TD
