@@ -257,7 +257,7 @@ const REASONS = REASONS_WITH_ICONS.map(r => r.name);
 const DEFAULT_ADMIN_EMAILS = ["angelyn.bondoc@neu.edu.ph", "jcesperanza@neu.edu.ph"];
 const isDefaultAdminEmail = (email?: string | null) => !!email && DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
 
-const NEU_LOGO = "https://scontent.fmnl17-6.fna.fbcdn.net/v/t39.30808-6/587748546_122156030186743934_2851142283168601511_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=XcurpbSYAxYQ7kNvwH4Jml7&_nc_oc=AdlaQg5JYJusEkjkJAxBPbop4uek1nntno4w8llnNy84Le6bWNhZpxwv1sGbPDB-nZc&_nc_zt=23&_nc_ht=scontent.fmnl17-6.fna&_nc_gid=1L5oGNhcvxhBfW0XcX5mYA&_nc_ss=8&oh=00_AfzVckmuGO5EBdWEdvI1PLdw-rMUucAl_5AZYPl4tc8a1Q&oe=69BC8A35";
+const NEU_LOGO = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSNK00sUW-w6S42sNrrd7G1Iu3uUwO98IZcjxKKQLJNk4bQrVx2KvMRarxrIQyOgl0RKypN9NFGhSg0J7X0qfB06bN_bZTT&s&ec=121584920";
 const LIB_LOGO = NEU_LOGO;
 
 // Searchable Select Component
@@ -1016,7 +1016,7 @@ export default function App() {
                 onClick={handleLogin}
                 className="w-full bg-neu-blue text-white rounded-2xl py-5 px-8 flex items-center justify-center gap-3 hover:bg-neu-cyan transition-all shadow-xl shadow-neu-blue/20 group cursor-pointer"
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" referrerPolicy="no-referrer" />
                 <span className="text-lg font-bold">Sign in with Google</span>
               </button>
 
@@ -1727,6 +1727,7 @@ export default function App() {
                                     src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
                                     alt="" 
                                     className="w-10 h-10 rounded-full"
+                                    referrerPolicy="no-referrer"
                                   />
                                   <div>
                                     <p className="font-bold text-neu-blue">{u.displayName}</p>
@@ -1906,6 +1907,7 @@ export default function App() {
                   src={effectiveProfile?.photoURL || `https://ui-avatars.com/api/?name=${effectiveProfile?.displayName}`} 
                   alt="Profile" 
                   className="w-24 h-24 rounded-full border-4 border-neu-white relative z-10 shadow-md"
+                  referrerPolicy="no-referrer"
                 />
                 <div className="text-center md:text-left space-y-1 relative z-10">
                   <h2 className="text-3xl font-bold text-neu-blue">{effectiveProfile?.displayName}</h2>
